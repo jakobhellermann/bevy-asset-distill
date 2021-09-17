@@ -1,0 +1,16 @@
+[package]
+name = "bevy_asset_distill"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy_ecs = { git = "https://github.com/bevyengine/bevy" }
+bevy_app = { git = "https://github.com/bevyengine/bevy" }
+bevy_utils = { git = "https://github.com/bevyengine/bevy" }
+bevy_log = { git = "https://github.com/bevyengine/bevy" }
+
+distill = { git = "https://github.com/amethyst/distill", features = ["distill-importer", "distill-daemon", "serde_importers", "type_uuid"] }
+
+serde = "1.0"
+bincode = "1.3.3"
+futures-executor = "0.3.17"
