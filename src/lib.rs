@@ -3,6 +3,7 @@ mod handle;
 mod storage;
 
 pub use asset_server::AssetServer;
+use distill::importer::BoxedImporter;
 use distill::loader::io::LoaderIO;
 use prelude::{Handle, HandleUntyped};
 pub use storage::Assets;
@@ -52,6 +53,8 @@ pub struct AssetPlugin;
 pub struct RefopReceiver(pub Receiver<RefOp>);
 pub struct RefopSender(pub Arc<Sender<RefOp>>);
 pub struct AssetHandleAllocator(pub Arc<dyn HandleAllocator>);
+#[derive(Default)]
+struct AssetLoaders(Vec<(&'static str, Box<dyn BoxedImporter + 'static>)>);
 
 pub enum AssetServerSettings {
     Daemon {
@@ -65,7 +68,7 @@ pub enum AssetServerSettings {
     PackfileStatic(&'static [u8]),
 }
 impl AssetServerSettings {
-    fn daemon(&self) -> Option<AssetDaemon> {
+    fn daemon(&self, asset_loaders: AssetLoaders) -> Option<AssetDaemon> {
         match *self {
             AssetServerSettings::Daemon {
                 ref db_path,
@@ -77,6 +80,7 @@ impl AssetServerSettings {
                 let mut asset_daemon = AssetDaemon::default()
                     .with_db_path(db_path)
                     .with_address(address)
+                    .with_importers_boxed(asset_loaders.0)
                     .with_asset_dirs(vec![PathBuf::from("assets")]);
                 if clear_db_on_start {
                     asset_daemon = asset_daemon.with_clear_db_on_start();
@@ -115,11 +119,11 @@ impl Default for AssetServerSettings {
 
 impl Plugin for AssetPlugin {
     fn build(&self, app: &mut App) {
-        let asset_server_settings = app
-            .world
-            .get_resource_or_insert_with(AssetServerSettings::default);
+        let world = &mut app.world;
+        let asset_loaders = world.remove_resource::<AssetLoaders>().unwrap_or_default();
+        let asset_server_settings = world.get_resource_or_insert_with(AssetServerSettings::default);
 
-        if let Some(daemon) = asset_server_settings.daemon() {
+        if let Some(daemon) = asset_server_settings.daemon(asset_loaders) {
             std::thread::spawn(|| daemon.run());
         }
 
@@ -185,13 +189,15 @@ fn process_asset_events_per_asset<A: Asset>(
 
 pub trait AddAsset {
     fn add_asset<T: Asset>(&mut self) -> &mut Self;
-
-    /*fn init_asset_loader<T>(&mut self) -> &mut Self
-    where
-        T: AssetLoader + FromWorld;
-    fn add_asset_loader<T>(&mut self, loader: T) -> &mut Self
-    where
-        T: AssetLoader;*/
+    fn init_asset_loader<T: BoxedImporter + FromWorld>(
+        &mut self,
+        extension: &'static str,
+    ) -> &mut Self;
+    fn add_asset_loader<T: BoxedImporter>(
+        &mut self,
+        extension: &'static str,
+        loader: T,
+    ) -> &mut Self;
 }
 
 impl AddAsset for App {
@@ -213,6 +219,26 @@ impl AddAsset for App {
             process_asset_events_per_asset::<A>.after(AssetSystem::ProcessAssetEvents),
         );
 
+        self
+    }
+
+    fn init_asset_loader<T: BoxedImporter + FromWorld>(
+        &mut self,
+        extension: &'static str,
+    ) -> &mut Self {
+        let loader = T::from_world(&mut self.world);
+        Self::add_asset_loader(self, extension, loader)
+    }
+
+    fn add_asset_loader<T: BoxedImporter>(
+        &mut self,
+        extension: &'static str,
+        loader: T,
+    ) -> &mut Self {
+        self.world
+            .get_resource_or_insert_with(AssetLoaders::default)
+            .0
+            .push((extension, Box::new(loader)));
         self
     }
 }
