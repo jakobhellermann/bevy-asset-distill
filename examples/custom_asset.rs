@@ -13,8 +13,9 @@ pub struct CustomAsset {
 
 fn main() {
     App::new()
-        .add_plugin(AssetPlugin)
         .add_plugin(ScheduleRunnerPlugin::default())
+        // .insert_resource(AssetServerSettings::PackfileStatic(include_bytes!("../assets.pack")))
+        .add_plugin(AssetPlugin)
         .add_asset::<CustomAsset>()
         .add_startup_system(setup)
         .add_system(system)
