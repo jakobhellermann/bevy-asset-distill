@@ -29,6 +29,7 @@ use self::storage::SharedAssets;
 pub mod prelude {
     pub use crate::loader::handle::Handle;
     pub use crate::{AddAsset, Asset, AssetServer, AssetServerSettings, Assets};
+    pub use distill::loader::handle::GenericHandle as HandleUntyped;
 }
 
 pub struct AssetPlugin;

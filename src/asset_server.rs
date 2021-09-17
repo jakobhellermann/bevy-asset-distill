@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use distill::core::{uuid, AssetTypeId, AssetUuid};
 use distill::loader::crossbeam_channel::Sender;
-use distill::loader::handle::RefOp;
-use distill::loader::storage::IndirectIdentifier;
-use distill::loader::Loader;
+use distill::loader::handle::{AssetHandle, GenericHandle, RefOp};
+use distill::loader::storage::{IndirectIdentifier, LoadInfo, LoadStatus};
+use distill::loader::{LoadHandle, Loader};
 
 use crate::prelude::*;
 
@@ -102,15 +102,28 @@ impl AssetServer {
     }
 
     pub fn load<A: Asset>(&self, load: impl Into<AssetLoadRef>) -> Handle<A> {
-        self.load_internal(load.into())
-    }
-    fn load_internal<A: Asset>(&self, load: AssetLoadRef) -> Handle<A> {
-        let load_handle = match load {
-            AssetLoadRef::UUID(uuid) => self.loader.add_ref(uuid),
-            AssetLoadRef::Indirect(id) => self.loader.add_ref_indirect(id),
-        };
-
+        let load_handle = self.load_internal(load.into());
         let handle = Handle::<A>::new((*self.refop_sender).clone(), load_handle);
         handle
+    }
+    pub fn load_untyped(&self, load: impl Into<AssetLoadRef>) -> HandleUntyped {
+        let load_handle = self.load_internal(load.into());
+        let handle = GenericHandle::new((*self.refop_sender).clone(), load_handle);
+        handle
+    }
+
+    fn load_internal(&self, load: AssetLoadRef) -> LoadHandle {
+        match load {
+            AssetLoadRef::UUID(uuid) => self.loader.add_ref(uuid),
+            AssetLoadRef::Indirect(id) => self.loader.add_ref_indirect(id),
+        }
+    }
+
+    pub fn get_load_status<A: AssetHandle>(&self, handle: A) -> LoadStatus {
+        self.loader.get_load_status(handle.load_handle())
+    }
+
+    pub fn get_load_info<A: AssetHandle>(&self, handle: A) -> Option<LoadInfo> {
+        self.loader.get_load_info(handle.load_handle())
     }
 }
