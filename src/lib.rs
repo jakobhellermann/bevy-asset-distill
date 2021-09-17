@@ -36,8 +36,15 @@ pub mod prelude {
     pub use crate::{AddAsset, Asset, AssetPlugin, AssetServer, AssetServerSettings, Assets};
 
     pub use distill::core::type_uuid::{self, TypeUuid};
+    pub use distill::importer::SerdeImportable;
+    // required for SerdeImportable
 
-    pub use serde::Deserialize;
+    #[doc(hidden)]
+    pub use distill::importer as distill_importer;
+    #[doc(hidden)]
+    pub use distill::importer::typetag;
+
+    pub use serde::{Deserialize, Serialize};
 }
 
 pub struct AssetPlugin;
