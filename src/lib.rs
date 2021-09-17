@@ -18,7 +18,9 @@ use distill::core::TypeUuidDynamic;
 use distill::daemon::AssetDaemon;
 use distill::loader::crossbeam_channel::{unbounded, Receiver, Sender};
 use distill::loader::handle::RefOp;
-use distill::loader::storage::DefaultIndirectionResolver;
+use distill::loader::storage::{
+    AtomicHandleAllocator, DefaultIndirectionResolver, HandleAllocator,
+};
 use distill::loader::{Loader, PackfileReader, RpcIO};
 use serde::Deserialize;
 
@@ -31,13 +33,18 @@ use self::storage::SharedAssets;
 
 pub mod prelude {
     pub use crate::handle::{Handle, HandleUntyped};
-    pub use crate::{AddAsset, Asset, AssetServer, AssetServerSettings, Assets};
+    pub use crate::{AddAsset, Asset, AssetPlugin, AssetServer, AssetServerSettings, Assets};
+
+    pub use distill::core::type_uuid::{self, TypeUuid};
+
+    pub use serde::Deserialize;
 }
 
 pub struct AssetPlugin;
 
 pub struct RefopReceiver(pub Receiver<RefOp>);
 pub struct RefopSender(pub Arc<Sender<RefOp>>);
+pub struct AssetHandleAllocator(pub Arc<dyn HandleAllocator>);
 
 pub enum AssetServerSettings {
     Daemon {
@@ -115,13 +122,17 @@ impl Plugin for AssetPlugin {
         let loader_io = asset_server_settings
             .loader_io()
             .expect("failed to create asset loader IO");
-        let loader = Loader::new(loader_io);
+
+        let handle_allocator =
+            Arc::new(AtomicHandleAllocator::default()) as Arc<dyn HandleAllocator>;
+        let loader = Loader::new_with_handle_allocator(loader_io, Arc::clone(&handle_allocator));
         let asset_server = AssetServer::new(loader, Arc::clone(&refop_sender));
 
         app.register_type::<HandleUntyped>()
             .insert_resource(asset_server)
             .insert_resource(RefopReceiver(refop_receiver))
             .insert_resource(RefopSender(refop_sender))
+            .insert_resource(AssetHandleAllocator(handle_allocator))
             .add_stage_before(
                 CoreStage::PreUpdate,
                 AssetStage::LoadAssets,
@@ -181,8 +192,10 @@ impl AddAsset for App {
         let assets = {
             let refop_sender = self.world.get_resource::<RefopSender>().unwrap();
             let asset_server = self.world.get_resource::<AssetServer>().unwrap();
+            let handle_allocator = self.world.get_resource::<AssetHandleAllocator>().unwrap();
             Assets::<A>::new(
                 Arc::clone(&refop_sender.0),
+                Arc::clone(&handle_allocator.0),
                 asset_server.loader().indirection_table(),
             )
         };

@@ -5,9 +5,11 @@ use std::sync::{Arc, Mutex};
 use distill::loader::crossbeam_channel::Sender;
 use distill::loader::handle::{AssetHandle, RefOp, TypedAssetStorage};
 use distill::loader::storage::{
-    AssetLoadOp, AssetStorage, IndirectionTable, LoadHandle, LoaderInfoProvider,
+    AssetLoadOp, AssetStorage, HandleAllocator, IndirectionTable, LoadHandle, LoaderInfoProvider,
 };
 use distill::loader::AssetTypeId;
+
+use crate::prelude::Handle;
 
 use super::Asset;
 
@@ -17,14 +19,20 @@ struct AssetState<A> {
 }
 pub struct Assets<A: Asset> {
     refop_sender: Arc<Sender<RefOp>>,
+    handle_allocator: Arc<dyn HandleAllocator>,
     assets: HashMap<LoadHandle, AssetState<A>>,
     uncommitted: HashMap<LoadHandle, AssetState<A>>,
     indirection_table: IndirectionTable,
 }
 impl<A: Asset> Assets<A> {
-    pub fn new(sender: Arc<Sender<RefOp>>, indirection_table: IndirectionTable) -> Self {
+    pub fn new(
+        sender: Arc<Sender<RefOp>>,
+        handle_allocator: Arc<dyn HandleAllocator>,
+        indirection_table: IndirectionTable,
+    ) -> Self {
         Self {
             refop_sender: sender,
+            handle_allocator,
             assets: HashMap::new(),
             uncommitted: HashMap::new(),
             indirection_table,
@@ -44,6 +52,14 @@ impl<A: Asset> Assets<A> {
     pub fn get_asset_with_version<T: AssetHandle>(&self, handle: &T) -> Option<(&A, u32)> {
         let handle = self.resolve_handle(handle.load_handle())?;
         self.assets.get(&handle).map(|a| (&a.asset, a.version))
+    }
+
+    pub fn add(&mut self, asset: A) -> Handle<A> {
+        let load_handle = self.handle_allocator.alloc();
+        self.assets
+            .insert(load_handle, AssetState { version: 0, asset });
+
+        Handle::new((*self.refop_sender).clone(), load_handle)
     }
 
     fn resolve_handle(&self, load_handle: LoadHandle) -> Option<LoadHandle> {
