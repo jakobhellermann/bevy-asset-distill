@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use distill::core::{uuid, AssetTypeId, AssetUuid};
 use distill::loader::crossbeam_channel::Sender;
-use distill::loader::handle::{AssetHandle, GenericHandle, RefOp};
+use distill::loader::handle::{AssetHandle, RefOp};
 use distill::loader::storage::{IndirectIdentifier, LoadInfo, LoadStatus};
 use distill::loader::{LoadHandle, Loader};
 
@@ -108,7 +108,7 @@ impl AssetServer {
     }
     pub fn load_untyped(&self, load: impl Into<AssetLoadRef>) -> HandleUntyped {
         let load_handle = self.load_internal(load.into());
-        let handle = GenericHandle::new((*self.refop_sender).clone(), load_handle);
+        let handle = HandleUntyped::new((*self.refop_sender).clone(), load_handle);
         handle
     }
 

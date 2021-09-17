@@ -1,11 +1,14 @@
 mod asset_server;
+mod handle;
 mod storage;
 
 pub use asset_server::AssetServer;
 use distill::loader::io::LoaderIO;
+use prelude::{Handle, HandleUntyped};
 pub use storage::Assets;
 
 use std::fs::File;
+use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -14,7 +17,7 @@ use distill::core::type_uuid::TypeUuid;
 use distill::core::TypeUuidDynamic;
 use distill::daemon::AssetDaemon;
 use distill::loader::crossbeam_channel::{unbounded, Receiver, Sender};
-use distill::loader::handle::{self, RefOp};
+use distill::loader::handle::RefOp;
 use distill::loader::storage::DefaultIndirectionResolver;
 use distill::loader::{Loader, PackfileReader, RpcIO};
 use serde::Deserialize;
@@ -27,9 +30,8 @@ use bevy_ecs::prelude::*;
 use self::storage::SharedAssets;
 
 pub mod prelude {
-    pub use crate::loader::handle::Handle;
+    pub use crate::handle::{Handle, HandleUntyped};
     pub use crate::{AddAsset, Asset, AssetServer, AssetServerSettings, Assets};
-    pub use distill::loader::handle::GenericHandle as HandleUntyped;
 }
 
 pub struct AssetPlugin;
@@ -116,7 +118,8 @@ impl Plugin for AssetPlugin {
         let loader = Loader::new(loader_io);
         let asset_server = AssetServer::new(loader, Arc::clone(&refop_sender));
 
-        app.insert_resource(asset_server)
+        app.register_type::<HandleUntyped>()
+            .insert_resource(asset_server)
             .insert_resource(RefopReceiver(refop_receiver))
             .insert_resource(RefopSender(refop_sender))
             .add_stage_before(
@@ -148,7 +151,7 @@ impl<T> AssetDynamic for T where T: Send + Sync + 'static + TypeUuidDynamic + fo
 {}
 
 fn process_asset_events(asset_server: Res<AssetServer>, refop_receiver: Res<RefopReceiver>) {
-    handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
+    loader::handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
 }
 
 fn process_asset_events_per_asset<A: Asset>(
@@ -185,7 +188,7 @@ impl AddAsset for App {
         };
         self.world.insert_resource(assets);
 
-        self.add_system_to_stage(
+        self.register_type::<Handle<A>>().add_system_to_stage(
             AssetStage::LoadAssets,
             process_asset_events_per_asset::<A>.after(AssetSystem::ProcessAssetEvents),
         );

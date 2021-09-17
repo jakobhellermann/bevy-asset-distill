@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 bevy_ecs = { git = "https://github.com/bevyengine/bevy" }
 bevy_app = { git = "https://github.com/bevyengine/bevy" }
+bevy_reflect = { git = "https://github.com/bevyengine/bevy" }
 bevy_utils = { git = "https://github.com/bevyengine/bevy" }
 bevy_log = { git = "https://github.com/bevyengine/bevy" }
 
