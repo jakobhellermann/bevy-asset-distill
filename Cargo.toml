@@ -49,7 +49,7 @@ name = "run_asset_daemon"
 required-features = ["asset-daemon"]
 
 [patch."https://github.com/amethyst/distill"]
-distill-core = { path = "/home/jakob/.tmp/distill/core" }
-distill-loader = { path = "/home/jakob/.tmp/distill/loader" }
-distill-importer = { path = "/home/jakob/.tmp/distill/importer" }
-distill-daemon = { path = "/home/jakob/.tmp/distill/daemon" }
+distill-core = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
+distill-loader = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
+distill-importer = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
+distill-daemon = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
