@@ -1,5 +1,6 @@
 mod asset_server;
 mod handle;
+pub mod importer;
 mod plugin;
 mod storage;
 pub mod util;
