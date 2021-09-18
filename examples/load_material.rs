@@ -3,6 +3,7 @@ use bevy_asset_distill::prelude::*;
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
 use bevy_ecs::prelude::*;
+use bevy_log::LogPlugin;
 
 #[derive(Serialize, Deserialize, TypeUuid, SerdeImportable, Debug)]
 #[uuid = "5812e726-a166-401f-88bf-5b77fa6add0b"]
@@ -18,6 +19,7 @@ struct PbrBundle {
 fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
+        .add_plugin(LogPlugin::default())
         .add_plugin(AssetPlugin)
         .add_asset::<Material>()
         .add_startup_system(setup)

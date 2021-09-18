@@ -4,6 +4,7 @@ use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
 use bevy_asset_distill::util::AssetUuidImporterState;
 use bevy_ecs::prelude::*;
+use bevy_log::LogPlugin;
 use distill_importer::{ImportedAsset, Importer, ImporterValue};
 use image::RgbaImage;
 
@@ -80,6 +81,7 @@ impl Importer for ImageImporter {
 fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
+        .add_plugin(LogPlugin::default())
         .add_asset_loader("png", ImageImporter)
         .add_plugin(AssetPlugin)
         .add_asset::<Image>()
