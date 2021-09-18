@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use distill_importer::{ImportedAsset, Importer, ImporterValue};
-
 use crate::util::AssetUuidImporterState;
+use distill_importer::{ImportedAsset, Importer, ImporterValue};
 
 #[derive(TypeUuid)]
 #[uuid = "5dc1ef8a-4b0c-423f-9d60-e953292e2d1d"]

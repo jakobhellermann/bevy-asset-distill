@@ -7,6 +7,7 @@ edition = "2021"
 asset-daemon = ["distill-daemon", "distill-loader/rpc_io"]
 packfile = ["distill-loader/packfile_io"]
 serde-importers = ["distill-importer/serde_importers"]
+ron-importer = ["ron"]
 
 [dependencies]
 bevy_ecs = { git = "https://github.com/bevyengine/bevy" }
@@ -24,6 +25,8 @@ serde = "1.0"
 bincode = "1.3"
 futures-executor = "0.3"
 uuid = "0.8"
+
+ron = { version = "0.6", optional = true }
 
 [dev-dependencies]
 image = { version = "0.23", default-features = false, features = ["png"] }
