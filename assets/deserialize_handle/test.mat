@@ -1,0 +1,5 @@
+(
+    color: (2, 2, 3, 4),
+    texture_by_path: "test.tex",
+    texture_by_uuid: "4c1386ee-eb7f-428d-8dc9-c4f6ba3e8761",
+)

@@ -48,6 +48,10 @@ name = "load_material"
 required-features = ["serde-importers", "asset-daemon"]
 
 [[example]]
+name = "deserialize_handle"
+required-features = ["asset-daemon", "ron-importer"]
+
+[[example]]
 name = "run_asset_daemon"
 required-features = ["asset-daemon"]
 
