@@ -12,7 +12,8 @@ use distill_core::type_uuid::TypeUuid;
 use distill_core::TypeUuidDynamic;
 use serde::Deserialize;
 
-pub use distill_loader;
+pub use distill_importer;
+pub use handle::{Handle, HandleUntyped};
 pub use plugin::{AssetPlugin, AssetStage};
 pub use storage::Assets;
 
