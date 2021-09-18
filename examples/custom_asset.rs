@@ -3,6 +3,7 @@ use bevy_asset_distill::prelude::*;
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
 use bevy_ecs::prelude::*;
+use bevy_log::LogPlugin;
 
 #[derive(Serialize, Deserialize, TypeUuid, SerdeImportable, Debug)]
 #[uuid = "fab4249b-f95d-411d-a017-7549df090a4f"]
@@ -13,6 +14,7 @@ pub struct CustomAsset {
 fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
+        .add_plugin(LogPlugin)
         // .insert_resource(AssetServerSettings::PackfileStatic(include_bytes!("../assets.pack")))
         .add_plugin(AssetPlugin)
         .add_asset::<CustomAsset>()
@@ -33,7 +35,13 @@ fn system(
     mut has_printed: Local<bool>,
     query: Query<&HandleComponent>,
     custom_assets: Res<Assets<CustomAsset>>,
+    mut asset_events: EventReader<AssetEvent<CustomAsset>>,
 ) {
+    for event in asset_events.iter() {
+        println!("Asset event: {:?}", event);
+        *has_printed = false;
+    }
+
     if *has_printed {
         return;
     }
@@ -41,7 +49,7 @@ fn system(
         let custom_asset = custom_assets.get(&handle.0);
 
         if let Some(custom_asset) = custom_asset {
-            dbg!(&custom_asset);
+            println!("{:?}", custom_asset);
             *has_printed = true;
         }
     }

@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::prelude::*;
 use crate::storage::SharedAssets;
+use crate::AssetEvent;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 
@@ -21,6 +22,7 @@ use distill::loader::{self, Loader, PackfileReader, RpcIO};
 #[derive(StageLabel, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum AssetStage {
     LoadAssets,
+    AssetEvents,
 }
 
 #[derive(SystemLabel, Debug, Clone, Hash, PartialEq, Eq)]
@@ -129,6 +131,11 @@ impl Plugin for AssetPlugin {
                 AssetStage::LoadAssets,
                 SystemStage::parallel()
                     .with_system(process_asset_events.label(AssetSystem::ProcessAssetEvents)),
+            )
+            .add_stage_after(
+                CoreStage::PostUpdate,
+                AssetStage::AssetEvents,
+                SystemStage::parallel(),
             );
     }
 }
@@ -175,10 +182,13 @@ impl AddAsset for App {
         };
         self.world.insert_resource(assets);
 
-        self.register_type::<Handle<A>>().add_system_to_stage(
-            AssetStage::LoadAssets,
-            process_asset_events_per_asset::<A>.after(AssetSystem::ProcessAssetEvents),
-        );
+        self.register_type::<Handle<A>>()
+            .add_event::<AssetEvent<A>>()
+            .add_system_to_stage(
+                AssetStage::LoadAssets,
+                process_asset_events_per_asset::<A>.after(AssetSystem::ProcessAssetEvents),
+            )
+            .add_system_to_stage(AssetStage::AssetEvents, Assets::<A>::asset_event_system);
 
         self
     }

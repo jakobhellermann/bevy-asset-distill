@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 
+use bevy_app::Events;
+use bevy_ecs::prelude::*;
+
 use distill::loader::crossbeam_channel::Sender;
 use distill::loader::handle::{AssetHandle, RefOp, TypedAssetStorage};
 use distill::loader::storage::{
@@ -9,7 +12,8 @@ use distill::loader::storage::{
 };
 use distill::loader::AssetTypeId;
 
-use crate::prelude::Handle;
+use crate::prelude::{Handle, WeakHandle};
+use crate::AssetEvent;
 
 use super::Asset;
 
@@ -23,6 +27,7 @@ pub struct Assets<A: Asset> {
     assets: HashMap<LoadHandle, AssetState<A>>,
     uncommitted: HashMap<LoadHandle, AssetState<A>>,
     indirection_table: IndirectionTable,
+    events: Events<AssetEvent<A>>,
 }
 impl<A: Asset> Assets<A> {
     pub fn new(
@@ -36,6 +41,7 @@ impl<A: Asset> Assets<A> {
             assets: HashMap::new(),
             uncommitted: HashMap::new(),
             indirection_table,
+            events: Events::default(),
         }
     }
 
@@ -54,12 +60,55 @@ impl<A: Asset> Assets<A> {
         self.assets.get(&handle).map(|a| (&a.asset, a.version))
     }
 
+    pub fn get_mut<T: AssetHandle>(&mut self, handle: &T) -> Option<&mut A> {
+        let handle = self.resolve_handle(handle.load_handle())?;
+
+        self.events.send(AssetEvent::Modified {
+            handle: WeakHandle::new(handle),
+        });
+
+        self.assets.get_mut(&handle).map(|a| &mut a.asset)
+    }
+
     pub fn add(&mut self, asset: A) -> Handle<A> {
         let load_handle = self.handle_allocator.alloc();
         self.assets
             .insert(load_handle, AssetState { version: 0, asset });
 
+        self.events.send(AssetEvent::Modified {
+            handle: WeakHandle::new(load_handle),
+        });
+
         Handle::new((*self.refop_sender).clone(), load_handle)
+    }
+
+    pub fn remove<T: AssetHandle>(&mut self, handle: &T) -> Option<A> {
+        let handle = self.resolve_handle(handle.load_handle())?;
+        let asset = self.assets.remove(&handle).map(|a| a.asset);
+        if asset.is_some() {
+            self.events.send(AssetEvent::Removed {
+                handle: WeakHandle::new(handle),
+            })
+        }
+        asset
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (WeakHandle<A>, &A)> {
+        self.assets
+            .iter()
+            .map(|(&k, v)| (WeakHandle::new(k), &v.asset))
+    }
+
+    pub fn ids(&self) -> impl Iterator<Item = WeakHandle<A>> + '_ {
+        self.assets.keys().map(|&handle| WeakHandle::new(handle))
+    }
+
+    pub fn len(&self) -> usize {
+        self.assets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.assets.is_empty()
     }
 
     fn resolve_handle(&self, load_handle: LoadHandle) -> Option<LoadHandle> {
@@ -67,6 +116,17 @@ impl<A: Asset> Assets<A> {
             self.indirection_table.resolve(load_handle)
         } else {
             Some(load_handle)
+        }
+    }
+
+    pub(crate) fn asset_event_system(
+        mut events: EventWriter<AssetEvent<A>>,
+        mut assets: ResMut<Assets<A>>,
+    ) {
+        // Check if the events are empty before calling `drain`.
+        // As `drain` triggers change detection.
+        if !assets.events.is_empty() {
+            events.send_batch(assets.events.drain())
         }
     }
 }
@@ -101,10 +161,17 @@ impl<'a, A: Asset> AssetStorage for SharedAssets<'a, A> {
 
         this.uncommitted
             .insert(load_handle, AssetState { version, asset });
-        bevy_log::info!("{} bytes loaded for {:?}", data.len(), load_handle);
         // The loading process could be async, in which case you can delay
         // calling `load_op.complete` as it should only be done when the asset is usable.
         load_op.complete();
+
+        bevy_log::trace!(
+            "updating asset {:?}@{} ({} bytes loaded)",
+            load_handle,
+            version,
+            data.len()
+        );
+
         Ok(())
     }
 
@@ -112,9 +179,14 @@ impl<'a, A: Asset> AssetStorage for SharedAssets<'a, A> {
         &self,
         _asset_type: &AssetTypeId,
         load_handle: LoadHandle,
-        _version: u32,
+        version: u32,
     ) {
+        bevy_log::trace!("commiting asset {:?}@{}", load_handle, version);
         let mut this = self.0.lock().unwrap();
+
+        let handle = WeakHandle::new(load_handle);
+        this.events.send(AssetEvent::Modified { handle });
+
         // The commit step is done after an asset load has completed.
         // It exists to avoid frames where an asset that was loaded is unloaded, which
         // could happen when hot reloading. To support this case, you must support having multiple
@@ -124,7 +196,6 @@ impl<'a, A: Asset> AssetStorage for SharedAssets<'a, A> {
             .remove(&load_handle)
             .expect("asset not present when committing");
         this.assets.insert(load_handle, asset_state);
-        bevy_log::info!("Commit {:?}", load_handle);
     }
 
     fn free(&self, _asset_type: &AssetTypeId, load_handle: LoadHandle, version: u32) {
@@ -140,7 +211,7 @@ impl<'a, A: Asset> AssetStorage for SharedAssets<'a, A> {
                 this.assets.remove(&load_handle);
             }
         }
-        bevy_log::info!("Free {:?}", load_handle);
+        bevy_log::trace!("free {:?}@{}", load_handle, version);
     }
 }
 
