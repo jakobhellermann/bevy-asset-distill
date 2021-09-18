@@ -1,11 +1,11 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use distill::core::{uuid, AssetTypeId, AssetUuid};
-use distill::loader::crossbeam_channel::Sender;
-use distill::loader::handle::{AssetHandle, RefOp};
-use distill::loader::storage::{IndirectIdentifier, LoadInfo, LoadStatus};
-use distill::loader::{LoadHandle, Loader};
+use distill_core::{AssetTypeId, AssetUuid};
+use distill_loader::crossbeam_channel::Sender;
+use distill_loader::handle::{AssetHandle, RefOp};
+use distill_loader::storage::{IndirectIdentifier, LoadInfo, LoadStatus};
+use distill_loader::{LoadHandle, Loader};
 
 use crate::prelude::*;
 

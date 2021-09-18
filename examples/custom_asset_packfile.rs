@@ -15,6 +15,9 @@ fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
         .add_plugin(LogPlugin)
+        .insert_resource(AssetServerSettings::Packfile(PackfileSettings::Static(
+            include_bytes!("../resources/assets.pack"),
+        )))
         .add_plugin(AssetPlugin)
         .add_asset::<CustomAsset>()
         .add_startup_system(setup)

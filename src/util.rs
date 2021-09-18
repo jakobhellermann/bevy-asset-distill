@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use distill::core::uuid::Uuid;
-use distill::core::AssetUuid;
+use distill_core::AssetUuid;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(TypeUuid, Serialize, Deserialize, Default)]
 #[uuid = "c3b191fe-1143-4187-b0e1-1ea7a33e47cb"]

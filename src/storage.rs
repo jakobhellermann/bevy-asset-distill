@@ -5,12 +5,12 @@ use std::sync::{Arc, Mutex};
 use bevy_app::Events;
 use bevy_ecs::prelude::*;
 
-use distill::loader::crossbeam_channel::Sender;
-use distill::loader::handle::{AssetHandle, RefOp, TypedAssetStorage};
-use distill::loader::storage::{
+use distill_loader::crossbeam_channel::Sender;
+use distill_loader::handle::{AssetHandle, RefOp, TypedAssetStorage};
+use distill_loader::storage::{
     AssetLoadOp, AssetStorage, HandleAllocator, IndirectionTable, LoadHandle, LoaderInfoProvider,
 };
-use distill::loader::AssetTypeId;
+use distill_loader::AssetTypeId;
 
 use crate::prelude::{Handle, WeakHandle};
 use crate::AssetEvent;
@@ -146,7 +146,7 @@ impl<'a, A: Asset> AssetStorage for SharedAssets<'a, A> {
         let mut this = self.0.lock().unwrap();
 
         // To enable automatic serde of Handle, we need to set up a SerdeContext with a RefOp sender
-        let asset = futures_executor::block_on(distill::loader::handle::SerdeContext::with(
+        let asset = futures_executor::block_on(distill_loader::handle::SerdeContext::with(
             loader_info,
             (*this.refop_sender).clone(),
             async { bincode::deserialize::<A>(&data) },

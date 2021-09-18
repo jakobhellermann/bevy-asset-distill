@@ -7,28 +7,34 @@ pub mod util;
 pub use asset_server::AssetServer;
 use handle::WeakHandle;
 
-use distill::core::type_uuid::TypeUuid;
-use distill::core::TypeUuidDynamic;
-
+use distill_core::type_uuid::TypeUuid;
+use distill_core::TypeUuidDynamic;
 use serde::Deserialize;
 
-pub use distill::loader;
+pub use distill_loader;
 pub use plugin::{AssetPlugin, AssetStage};
 pub use storage::Assets;
 
 pub mod prelude {
     pub use crate::handle::{Handle, HandleUntyped, WeakHandle};
+    #[cfg(feature = "asset-daemon")]
+    pub use crate::plugin::AssetDaemonSettings;
+    #[cfg(feature = "packfile")]
+    pub use crate::plugin::PackfileSettings;
     pub use crate::plugin::{AddAsset, AssetPlugin, AssetServerSettings};
     pub use crate::{Asset, AssetEvent, AssetServer, Assets};
 
-    pub use distill::core::type_uuid::{self, TypeUuid};
-    pub use distill::importer::SerdeImportable;
+    pub use distill_core::type_uuid::{self, TypeUuid};
+    #[cfg(feature = "serde-importers")]
+    pub use distill_importer::SerdeImportable;
 
     // required for SerdeImportable
     #[doc(hidden)]
-    pub use distill::importer as distill_importer;
+    #[cfg(feature = "serde-importers")]
+    pub use distill_importer;
     #[doc(hidden)]
-    pub use distill::importer::typetag;
+    #[cfg(feature = "serde-importers")]
+    pub use distill_importer::typetag;
 
     pub use serde::{Deserialize, Serialize};
 }

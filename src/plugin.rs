@@ -1,7 +1,4 @@
-use std::fs::File;
 use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::prelude::*;
@@ -10,15 +7,12 @@ use crate::AssetEvent;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 
-use distill::daemon::AssetDaemon;
-use distill::importer::BoxedImporter;
-use distill::loader::crossbeam_channel::{unbounded, Receiver, Sender};
-use distill::loader::handle::RefOp;
-use distill::loader::io::LoaderIO;
-use distill::loader::storage::{
-    AtomicHandleAllocator, DefaultIndirectionResolver, HandleAllocator,
-};
-use distill::loader::{self, Loader, PackfileReader, RpcIO};
+use distill_importer::BoxedImporter;
+use distill_loader::crossbeam_channel::{unbounded, Receiver, Sender};
+use distill_loader::handle::RefOp;
+use distill_loader::io::LoaderIO;
+use distill_loader::storage::{AtomicHandleAllocator, DefaultIndirectionResolver, HandleAllocator};
+use distill_loader::{self, Loader};
 
 #[derive(StageLabel, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum AssetStage {
@@ -30,63 +24,89 @@ enum AssetSystem {
     ProcessAssetEvents,
 }
 
+#[derive(Debug, Clone)]
 pub enum AssetServerSettings {
-    Daemon {
-        db_path: PathBuf,
-        address: SocketAddr,
-        clear_db_on_start: bool,
-    },
-    Packfile {
-        path: PathBuf,
-    },
-    PackfileStatic(&'static [u8]),
+    #[cfg(feature = "asset-daemon")]
+    Daemon(AssetDaemonSettings),
+    #[cfg(feature = "packfile")]
+    Packfile(PackfileSettings),
 }
-impl Default for AssetServerSettings {
+
+#[cfg(feature = "packfile")]
+#[derive(Debug, Clone)]
+pub enum PackfileSettings {
+    #[cfg(not(target_family = "wasm"))]
+    Path(std::path::PathBuf),
+    Static(&'static [u8]),
+}
+
+#[cfg(feature = "asset-daemon")]
+#[derive(Debug, Clone)]
+pub struct AssetDaemonSettings {
+    asset_dirs: Vec<std::path::PathBuf>,
+    db_path: std::path::PathBuf,
+    address: std::net::SocketAddr,
+    clear_db_on_start: bool,
+}
+
+#[cfg(feature = "asset-daemon")]
+impl Default for AssetDaemonSettings {
     fn default() -> Self {
-        AssetServerSettings::Daemon {
-            db_path: PathBuf::from(".assets_db"),
+        AssetDaemonSettings {
+            asset_dirs: vec![std::path::PathBuf::from("assets")],
+            db_path: std::path::PathBuf::from(".assets_db"),
             address: ([127, 0, 0, 1], 9999).into(),
             clear_db_on_start: false,
         }
     }
 }
+
 impl AssetServerSettings {
-    fn daemon(&self, asset_loaders: AssetLoaders) -> Option<AssetDaemon> {
+    #[cfg(feature = "asset-daemon")]
+    fn daemon(&self, asset_loaders: AssetLoaders) -> Option<distill_daemon::AssetDaemon> {
         match *self {
-            AssetServerSettings::Daemon {
+            AssetServerSettings::Daemon(AssetDaemonSettings {
+                ref asset_dirs,
                 ref db_path,
                 ref address,
                 clear_db_on_start,
-            } => {
+            }) => {
                 let db_path = db_path.clone();
                 let address = address.clone();
-                let mut asset_daemon = AssetDaemon::default()
+                let mut asset_daemon = distill_daemon::AssetDaemon::default()
                     .with_db_path(db_path)
                     .with_address(address)
                     .with_importers_boxed(asset_loaders.0)
-                    .with_asset_dirs(vec![PathBuf::from("assets")]);
+                    .with_asset_dirs(asset_dirs.clone());
                 if clear_db_on_start {
                     asset_daemon = asset_daemon.with_clear_db_on_start();
                 }
                 Some(asset_daemon)
             }
+            #[allow(unreachable_patterns)]
             _ => None,
         }
     }
 
     fn loader_io(&self) -> Result<Box<dyn LoaderIO>, Box<dyn std::error::Error>> {
-        Ok(match self {
-            AssetServerSettings::Daemon { address, .. } => {
-                Box::new(RpcIO::new(address.to_string()).unwrap())
+        match *self {
+            #[cfg(feature = "asset-daemon")]
+            AssetServerSettings::Daemon(ref settings) => Ok(Box::new(
+                distill_loader::RpcIO::new(settings.address.to_string()).unwrap(),
+            )),
+            #[cfg(feature = "packfile")]
+            #[cfg(not(target_family = "wasm"))]
+            AssetServerSettings::Packfile(PackfileSettings::Path(ref path)) => {
+                let file = std::fs::File::open(path)?;
+                Ok(Box::new(distill_loader::PackfileReader::new_from_file(
+                    file,
+                )?))
             }
-            AssetServerSettings::Packfile { path } => {
-                let file = File::open(path)?;
-                Box::new(PackfileReader::new_from_file(file)?)
-            }
-            AssetServerSettings::PackfileStatic(buffer) => {
-                Box::new(PackfileReader::new_from_buffer(buffer)?)
-            }
-        })
+            #[cfg(feature = "packfile")]
+            AssetServerSettings::Packfile(PackfileSettings::Static(bytes)) => Ok(Box::new(
+                distill_loader::PackfileReader::new_from_buffer(bytes)?,
+            )),
+        }
     }
 }
 
@@ -102,9 +122,17 @@ struct AssetLoaders(Vec<(&'static str, Box<dyn BoxedImporter + 'static>)>);
 impl Plugin for AssetPlugin {
     fn build(&self, app: &mut App) {
         let world = &mut app.world;
+        #[allow(unused_variables)]
         let asset_loaders = world.remove_resource::<AssetLoaders>().unwrap_or_default();
-        let asset_server_settings = world.get_resource_or_insert_with(AssetServerSettings::default);
 
+        #[cfg(feature = "asset-daemon")]
+        let asset_server_settings = world.get_resource_or_insert_with(|| {
+            AssetServerSettings::Daemon(AssetDaemonSettings::default())
+        });
+        #[cfg(not(feature = "asset-daemon"))]
+        let asset_server_settings = world.get_resource::<AssetServerSettings>().expect("missing `AssetServerSettings` resource. Either insert it or enable the `asset-daemon` feature");
+
+        #[cfg(feature = "asset-daemon")]
         if let Some(daemon) = asset_server_settings.daemon(asset_loaders) {
             std::thread::spawn(|| daemon.run());
         }
@@ -136,7 +164,7 @@ impl Plugin for AssetPlugin {
 }
 
 fn process_asset_events(asset_server: Res<AssetServer>, refop_receiver: Res<RefopReceiver>) {
-    loader::handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
+    distill_loader::handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
 }
 
 fn process_asset_events_per_asset<A: Asset>(

@@ -4,7 +4,7 @@ use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
 use bevy_asset_distill::util::AssetUuidImporterState;
 use bevy_ecs::prelude::*;
-use distill::importer::{ImportedAsset, Importer, ImporterValue};
+use distill_importer::{ImportedAsset, Importer, ImporterValue};
 use image::RgbaImage;
 
 #[derive(TypeUuid, Deserialize, Serialize, Clone)]

@@ -1,4 +1,4 @@
-use distill::daemon::AssetDaemon;
+use distill_daemon::AssetDaemon;
 
 fn main() {
     let (handle, _) = AssetDaemon::default().run();

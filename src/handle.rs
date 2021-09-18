@@ -4,9 +4,9 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use distill::loader::crossbeam_channel::Sender;
-use distill::loader::handle::{self, AssetHandle, RefOp};
-use distill::loader::LoadHandle;
+use distill_loader::crossbeam_channel::Sender;
+use distill_loader::handle::{self, AssetHandle, RefOp};
+use distill_loader::LoadHandle;
 use serde::Serialize;
 
 pub struct Handle<A: Asset>(handle::Handle<A>);

@@ -3,6 +3,11 @@ name = "bevy_asset_distill"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+asset-daemon = ["distill-daemon", "distill-loader/rpc_io"]
+packfile = ["distill-loader/packfile_io"]
+serde-importers = ["distill-importer/serde_importers"]
+
 [dependencies]
 bevy_ecs = { git = "https://github.com/bevyengine/bevy" }
 bevy_app = { git = "https://github.com/bevyengine/bevy" }
@@ -10,11 +15,41 @@ bevy_reflect = { git = "https://github.com/bevyengine/bevy" }
 bevy_utils = { git = "https://github.com/bevyengine/bevy" }
 bevy_log = { git = "https://github.com/bevyengine/bevy" }
 
-distill = { git = "https://github.com/amethyst/distill", features = ["distill-importer", "distill-daemon", "serde_importers", "type_uuid"] }
+distill-core = { git = "https://github.com/amethyst/distill", features = ["type_uuid"] }
+distill-loader = { git = "https://github.com/amethyst/distill", features = ["handle"] }
+distill-importer = { git = "https://github.com/amethyst/distill" }
+distill-daemon = { git = "https://github.com/amethyst/distill", optional = true }
 
 serde = "1.0"
-bincode = "1.3.3"
-futures-executor = "0.3.17"
+bincode = "1.3"
+futures-executor = "0.3"
+uuid = "0.8"
 
 [dev-dependencies]
 image = { version = "0.23", default-features = false, features = ["png"] }
+
+[[example]]
+name = "custom_asset"
+required-features = ["serde-importers", "asset-daemon"]
+
+[[example]]
+name = "custom_asset_packfile"
+required-features = ["serde-importers", "packfile"]
+
+[[example]]
+name = "custom_asset_loader"
+required-features = ["serde-importers", "asset-daemon"]
+
+[[example]]
+name = "load_material"
+required-features = ["serde-importers", "asset-daemon"]
+
+[[example]]
+name = "run_asset_daemon"
+required-features = ["asset-daemon"]
+
+[patch."https://github.com/amethyst/distill"]
+distill-core = { path = "/home/jakob/.tmp/distill/core" }
+distill-loader = { path = "/home/jakob/.tmp/distill/loader" }
+distill-importer = { path = "/home/jakob/.tmp/distill/importer" }
+distill-daemon = { path = "/home/jakob/.tmp/distill/daemon" }
