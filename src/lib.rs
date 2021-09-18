@@ -2,6 +2,7 @@ mod asset_server;
 mod handle;
 mod plugin;
 mod storage;
+pub mod util;
 
 pub use asset_server::AssetServer;
 use handle::WeakHandle;
