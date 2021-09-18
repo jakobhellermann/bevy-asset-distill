@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -22,7 +23,6 @@ use distill::loader::{self, Loader, PackfileReader, RpcIO};
 #[derive(StageLabel, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum AssetStage {
     LoadAssets,
-    AssetEvents,
 }
 
 #[derive(SystemLabel, Debug, Clone, Hash, PartialEq, Eq)]
@@ -131,11 +131,6 @@ impl Plugin for AssetPlugin {
                 AssetStage::LoadAssets,
                 SystemStage::parallel()
                     .with_system(process_asset_events.label(AssetSystem::ProcessAssetEvents)),
-            )
-            .add_stage_after(
-                CoreStage::PostUpdate,
-                AssetStage::AssetEvents,
-                SystemStage::parallel(),
             );
     }
 }
@@ -186,9 +181,14 @@ impl AddAsset for App {
             .add_event::<AssetEvent<A>>()
             .add_system_to_stage(
                 AssetStage::LoadAssets,
-                process_asset_events_per_asset::<A>.after(AssetSystem::ProcessAssetEvents),
+                process_asset_events_per_asset::<A>
+                    .after(AssetSystem::ProcessAssetEvents)
+                    .label(ProcessAssetEventsSystem::<A>::new()),
             )
-            .add_system_to_stage(AssetStage::AssetEvents, Assets::<A>::asset_event_system);
+            .add_system_to_stage(
+                AssetStage::LoadAssets,
+                Assets::<A>::asset_event_system.after(ProcessAssetEventsSystem::<A>::new()),
+            );
 
         self
     }
@@ -211,5 +211,34 @@ impl AddAsset for App {
             .0
             .push((extension, Box::new(loader)));
         self
+    }
+}
+
+#[derive(SystemLabel)]
+struct ProcessAssetEventsSystem<A>(PhantomData<A>);
+impl<A> ProcessAssetEventsSystem<A> {
+    fn new() -> Self {
+        ProcessAssetEventsSystem(PhantomData)
+    }
+}
+impl<A> std::fmt::Debug for ProcessAssetEventsSystem<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ProcessAssetEventsSystem<")?;
+        f.write_str(std::any::type_name::<A>())?;
+        f.write_str(">")
+    }
+}
+impl<A> std::hash::Hash for ProcessAssetEventsSystem<A> {
+    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
+}
+impl<A> PartialEq for ProcessAssetEventsSystem<A> {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+impl<A> Eq for ProcessAssetEventsSystem<A> {}
+impl<A> Clone for ProcessAssetEventsSystem<A> {
+    fn clone(&self) -> Self {
+        ProcessAssetEventsSystem::new()
     }
 }
