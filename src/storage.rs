@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 use bevy_app::Events;
 use bevy_ecs::prelude::*;
 
+use bevy_utils::HashMap;
 use distill_loader::crossbeam_channel::Sender;
 use distill_loader::handle::{AssetHandle, RefOp, TypedAssetStorage};
 use distill_loader::storage::{
@@ -38,8 +38,8 @@ impl<A: Asset> Assets<A> {
         Self {
             refop_sender: sender,
             handle_allocator,
-            assets: HashMap::new(),
-            uncommitted: HashMap::new(),
+            assets: HashMap::default(),
+            uncommitted: HashMap::default(),
             indirection_table,
             events: Events::default(),
         }
@@ -131,90 +131,6 @@ impl<A: Asset> Assets<A> {
     }
 }
 
-pub(crate) struct SharedAssets<'a, A: Asset>(pub Mutex<&'a mut Assets<A>>);
-
-impl<'a, A: Asset> AssetStorage for SharedAssets<'a, A> {
-    fn update_asset(
-        &self,
-        loader_info: &dyn LoaderInfoProvider,
-        _asset_type: &AssetTypeId,
-        data: Vec<u8>,
-        load_handle: LoadHandle,
-        load_op: AssetLoadOp,
-        version: u32,
-    ) -> Result<(), Box<dyn Error + Send + 'static>> {
-        let mut this = self.0.lock().unwrap();
-
-        // To enable automatic serde of Handle, we need to set up a SerdeContext with a RefOp sender
-        let asset = futures_executor::block_on(distill_loader::handle::SerdeContext::with(
-            loader_info,
-            (*this.refop_sender).clone(),
-            async { bincode::deserialize::<A>(&data) },
-        ));
-        let asset = match asset {
-            Ok(asset) => asset,
-            Err(e) => {
-                load_op.error(e);
-                return Ok(());
-            }
-        };
-
-        this.uncommitted
-            .insert(load_handle, AssetState { version, asset });
-        // The loading process could be async, in which case you can delay
-        // calling `load_op.complete` as it should only be done when the asset is usable.
-        load_op.complete();
-
-        bevy_log::trace!(
-            "updating asset {:?}@{} ({} bytes loaded)",
-            load_handle,
-            version,
-            data.len()
-        );
-
-        Ok(())
-    }
-
-    fn commit_asset_version(
-        &self,
-        _asset_type: &AssetTypeId,
-        load_handle: LoadHandle,
-        version: u32,
-    ) {
-        bevy_log::trace!("commiting asset {:?}@{}", load_handle, version);
-        let mut this = self.0.lock().unwrap();
-
-        let handle = WeakHandle::new(load_handle);
-        this.events.send(AssetEvent::Modified { handle });
-
-        // The commit step is done after an asset load has completed.
-        // It exists to avoid frames where an asset that was loaded is unloaded, which
-        // could happen when hot reloading. To support this case, you must support having multiple
-        // versions of an asset loaded at the same time.
-        let asset_state = this
-            .uncommitted
-            .remove(&load_handle)
-            .expect("asset not present when committing");
-        this.assets.insert(load_handle, asset_state);
-    }
-
-    fn free(&self, _asset_type: &AssetTypeId, load_handle: LoadHandle, version: u32) {
-        let mut this = self.0.lock().unwrap();
-
-        if let Some(asset) = this.uncommitted.get(&load_handle) {
-            if asset.version == version {
-                this.uncommitted.remove(&load_handle);
-            }
-        }
-        if let Some(asset) = this.assets.get(&load_handle) {
-            if asset.version == version {
-                this.assets.remove(&load_handle);
-            }
-        }
-        bevy_log::trace!("free {:?}@{}", load_handle, version);
-    }
-}
-
 impl<A: Asset> TypedAssetStorage<A> for Assets<A> {
     fn get<T: AssetHandle>(&self, handle: &T) -> Option<&A> {
         self.get(handle)
@@ -226,5 +142,211 @@ impl<A: Asset> TypedAssetStorage<A> for Assets<A> {
 
     fn get_asset_with_version<T: AssetHandle>(&self, handle: &T) -> Option<(&A, u32)> {
         self.get_asset_with_version(handle)
+    }
+}
+
+pub trait MutableAssetStorage {
+    fn update_asset(
+        &mut self,
+        loader_info: &dyn LoaderInfoProvider,
+        asset_type_id: &AssetTypeId,
+        data: Vec<u8>,
+        load_handle: LoadHandle,
+        load_op: AssetLoadOp,
+        version: u32,
+    ) -> Result<(), Box<dyn Error + Send + 'static>>;
+    fn commit_asset_version(
+        &mut self,
+        asset_type: &AssetTypeId,
+        load_handle: LoadHandle,
+        version: u32,
+    );
+    fn free(&mut self, asset_type_id: &AssetTypeId, load_handle: LoadHandle, version: u32);
+}
+
+impl<A: Asset> MutableAssetStorage for Assets<A> {
+    fn update_asset(
+        &mut self,
+        loader_info: &dyn LoaderInfoProvider,
+        asset_type: &AssetTypeId,
+        data: Vec<u8>,
+        load_handle: LoadHandle,
+        load_op: AssetLoadOp,
+        version: u32,
+    ) -> Result<(), Box<dyn Error + Send + 'static>> {
+        debug_assert_eq!(A::UUID, asset_type.0);
+
+        // To enable automatic serde of Handle, we need to set up a SerdeContext with a RefOp sender
+        let asset = futures_executor::block_on(distill_loader::handle::SerdeContext::with(
+            loader_info,
+            (*self.refop_sender).clone(),
+            async { bincode::deserialize::<A>(&data) },
+        ));
+        let asset = match asset {
+            Ok(asset) => asset,
+            Err(e) => {
+                load_op.error(e);
+                return Ok(());
+            }
+        };
+
+        self.uncommitted
+            .insert(load_handle, AssetState { version, asset });
+        // The loading process could be async, in which case you can delay
+        // calling `load_op.complete` as it should only be done when the asset is usable.
+        load_op.complete();
+
+        bevy_log::trace!(
+            "updating asset {:?}@{} (type {}, {} bytes loaded)",
+            load_handle,
+            version,
+            std::any::type_name::<A>(),
+            data.len()
+        );
+
+        Ok(())
+    }
+
+    fn commit_asset_version(
+        &mut self,
+        asset_type: &AssetTypeId,
+        load_handle: LoadHandle,
+        version: u32,
+    ) {
+        debug_assert_eq!(A::UUID, asset_type.0);
+
+        bevy_log::trace!(
+            "commiting asset {:?}@{} (type {})",
+            load_handle,
+            version,
+            std::any::type_name::<A>(),
+        );
+        let handle = WeakHandle::new(load_handle);
+        self.events.send(AssetEvent::Modified { handle });
+
+        // The commit step is done after an asset load has completed.
+        // It exists to avoid frames where an asset that was loaded is unloaded, which
+        // could happen when hot reloading. To support this case, you must support having multiple
+        // versions of an asset loaded at the same time.
+        let asset_state = self
+            .uncommitted
+            .remove(&load_handle)
+            .expect("asset not present when committing");
+        self.assets.insert(load_handle, asset_state);
+    }
+
+    fn free(&mut self, asset_type: &AssetTypeId, load_handle: LoadHandle, version: u32) {
+        debug_assert_eq!(A::UUID, asset_type.0);
+
+        if let Some(asset) = self.uncommitted.get(&load_handle) {
+            if asset.version == version {
+                self.uncommitted.remove(&load_handle);
+            }
+        }
+        if let Some(asset) = self.assets.get(&load_handle) {
+            if asset.version == version {
+                self.assets.remove(&load_handle);
+            }
+        }
+        bevy_log::trace!("free {:?}@{}", load_handle, version);
+    }
+}
+
+// this is necessary because the `AssetStorage` has a `&self` parameter instead of `&mut self`
+pub struct SharedAssets<'a>(pub Mutex<&'a mut dyn MutableAssetStorage>);
+impl<'a> AssetStorage for SharedAssets<'a> {
+    fn update_asset(
+        &self,
+        loader_info: &dyn LoaderInfoProvider,
+        asset_type: &AssetTypeId,
+        data: Vec<u8>,
+        load_handle: LoadHandle,
+        load_op: AssetLoadOp,
+        version: u32,
+    ) -> Result<(), Box<dyn Error + Send + 'static>> {
+        let mut this = self.0.lock().unwrap();
+        this.update_asset(loader_info, asset_type, data, load_handle, load_op, version)
+    }
+
+    fn commit_asset_version(
+        &self,
+        asset_type: &AssetTypeId,
+        load_handle: LoadHandle,
+        version: u32,
+    ) {
+        let mut this = self.0.lock().unwrap();
+        this.commit_asset_version(asset_type, load_handle, version)
+    }
+
+    fn free(&self, asset_type: &AssetTypeId, load_handle: LoadHandle, version: u32) {
+        let mut this = self.0.lock().unwrap();
+        this.free(asset_type, load_handle, version)
+    }
+}
+
+type AssetStorageProvider =
+    Box<dyn (Fn(&mut World) -> &mut dyn MutableAssetStorage) + Send + Sync + 'static>;
+
+#[derive(Default)]
+pub struct AssetResources(HashMap<AssetTypeId, AssetStorageProvider>);
+impl AssetResources {
+    pub fn add<A: Asset>(&mut self) {
+        let asset_type = AssetTypeId(A::UUID);
+        self.0.insert(
+            asset_type,
+            Box::new(|world| world.get_resource_mut::<Assets<A>>().unwrap().into_inner()),
+        );
+    }
+}
+
+pub(crate) struct WorldAssetStorage<'w>(pub Mutex<&'w mut World>, pub &'w AssetResources);
+impl<'w> WorldAssetStorage<'w> {
+    fn with<R>(&self, asset_type: &AssetTypeId, f: impl FnOnce(&dyn AssetStorage) -> R) -> R {
+        let mut world = self.0.lock().unwrap();
+        // TODO: better error message
+        let func = self.1 .0.get(asset_type).expect("asset not registered");
+        let typed_storage = func(&mut world);
+
+        let storage = SharedAssets(Mutex::new(typed_storage));
+        f(&storage)
+    }
+}
+impl AssetStorage for WorldAssetStorage<'_> {
+    fn update_asset(
+        &self,
+        loader_info: &dyn LoaderInfoProvider,
+        asset_type_id: &AssetTypeId,
+        data: Vec<u8>,
+        load_handle: LoadHandle,
+        load_op: AssetLoadOp,
+        version: u32,
+    ) -> Result<(), Box<dyn Error + Send + 'static>> {
+        self.with(asset_type_id, |storage| {
+            storage.update_asset(
+                loader_info,
+                asset_type_id,
+                data,
+                load_handle,
+                load_op,
+                version,
+            )
+        })
+    }
+
+    fn commit_asset_version(
+        &self,
+        asset_type: &AssetTypeId,
+        load_handle: LoadHandle,
+        version: u32,
+    ) {
+        self.with(asset_type, |storage| {
+            storage.commit_asset_version(asset_type, load_handle, version)
+        })
+    }
+
+    fn free(&self, asset_type_id: &AssetTypeId, load_handle: LoadHandle, version: u32) {
+        self.with(asset_type_id, |storage| {
+            storage.free(asset_type_id, load_handle, version)
+        })
     }
 }

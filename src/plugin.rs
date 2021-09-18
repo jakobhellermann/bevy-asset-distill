@@ -1,8 +1,7 @@
-use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use crate::prelude::*;
-use crate::storage::SharedAssets;
+use crate::storage::{AssetResources, WorldAssetStorage};
 use crate::AssetEvent;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -150,6 +149,7 @@ impl Plugin for AssetPlugin {
         let asset_server = AssetServer::new(loader, Arc::clone(&refop_sender));
 
         app.register_type::<HandleUntyped>()
+            .init_resource::<AssetResources>()
             .insert_resource(asset_server)
             .insert_resource(RefopReceiver(refop_receiver))
             .insert_resource(RefopSender(refop_sender))
@@ -157,25 +157,30 @@ impl Plugin for AssetPlugin {
             .add_stage_before(
                 CoreStage::PreUpdate,
                 AssetStage::LoadAssets,
-                SystemStage::parallel()
-                    .with_system(process_asset_events.label(AssetSystem::ProcessAssetEvents)),
+                SystemStage::parallel().with_system(
+                    process_asset_events
+                        .exclusive_system()
+                        .at_start()
+                        .label(AssetSystem::ProcessAssetEvents),
+                ),
             );
     }
 }
 
-fn process_asset_events(asset_server: Res<AssetServer>, refop_receiver: Res<RefopReceiver>) {
-    distill_loader::handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
-}
+fn process_asset_events(world: &mut World) {
+    world.resource_scope(|world, mut asset_server: Mut<AssetServer>| {
+        let refop_receiver = world.get_resource::<RefopReceiver>().unwrap();
+        distill_loader::handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
 
-fn process_asset_events_per_asset<A: Asset>(
-    mut asset_server: ResMut<AssetServer>,
-    mut asset_storage: ResMut<Assets<A>>,
-) {
-    let shared_assets = SharedAssets(Mutex::new(&mut *asset_storage));
-    asset_server
-        .loader_mut()
-        .process(&shared_assets, &DefaultIndirectionResolver)
-        .unwrap();
+        world.resource_scope(|world, asset_resources: Mut<AssetResources>| {
+            let asset_storage = WorldAssetStorage(Mutex::new(world), &*asset_resources);
+
+            asset_server
+                .loader_mut()
+                .process(&asset_storage, &DefaultIndirectionResolver)
+                .unwrap();
+        });
+    });
 }
 
 pub trait AddAsset {
@@ -205,17 +210,16 @@ impl AddAsset for App {
         };
         self.world.insert_resource(assets);
 
+        self.world
+            .get_resource_mut::<AssetResources>()
+            .unwrap()
+            .add::<A>();
+
         self.register_type::<Handle<A>>()
             .add_event::<AssetEvent<A>>()
             .add_system_to_stage(
                 AssetStage::LoadAssets,
-                process_asset_events_per_asset::<A>
-                    .after(AssetSystem::ProcessAssetEvents)
-                    .label(ProcessAssetEventsSystem::<A>::new()),
-            )
-            .add_system_to_stage(
-                AssetStage::LoadAssets,
-                Assets::<A>::asset_event_system.after(ProcessAssetEventsSystem::<A>::new()),
+                Assets::<A>::asset_event_system, // .after(AssetSystem::ProcessAssetEvents),
             );
 
         self
@@ -239,34 +243,5 @@ impl AddAsset for App {
             .0
             .push((extension, Box::new(loader)));
         self
-    }
-}
-
-#[derive(SystemLabel)]
-struct ProcessAssetEventsSystem<A>(PhantomData<A>);
-impl<A> ProcessAssetEventsSystem<A> {
-    fn new() -> Self {
-        ProcessAssetEventsSystem(PhantomData)
-    }
-}
-impl<A> std::fmt::Debug for ProcessAssetEventsSystem<A> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("ProcessAssetEventsSystem<")?;
-        f.write_str(std::any::type_name::<A>())?;
-        f.write_str(">")
-    }
-}
-impl<A> std::hash::Hash for ProcessAssetEventsSystem<A> {
-    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
-}
-impl<A> PartialEq for ProcessAssetEventsSystem<A> {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
-impl<A> Eq for ProcessAssetEventsSystem<A> {}
-impl<A> Clone for ProcessAssetEventsSystem<A> {
-    fn clone(&self) -> Self {
-        ProcessAssetEventsSystem::new()
     }
 }
