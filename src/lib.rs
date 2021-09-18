@@ -15,7 +15,7 @@ pub use plugin::{AssetPlugin, AssetStage};
 pub use storage::Assets;
 
 pub mod prelude {
-    pub use crate::handle::{Handle, HandleUntyped};
+    pub use crate::handle::{Handle, HandleUntyped, WeakHandle};
     pub use crate::plugin::{AddAsset, AssetPlugin, AssetServerSettings};
     pub use crate::{Asset, AssetServer, Assets};
 

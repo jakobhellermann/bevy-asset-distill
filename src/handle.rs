@@ -2,6 +2,7 @@ use crate::prelude::*;
 use bevy_reflect::prelude::*;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::marker::PhantomData;
 
 use distill::loader::crossbeam_channel::Sender;
 use distill::loader::handle::{self, AssetHandle, RefOp};
@@ -12,6 +13,10 @@ pub struct Handle<A: Asset>(handle::Handle<A>);
 impl<A: Asset> Handle<A> {
     pub(crate) fn new(refop_sender: Sender<RefOp>, load_handle: LoadHandle) -> Handle<A> {
         Handle(handle::Handle::new(refop_sender, load_handle))
+    }
+
+    pub fn as_weak(&self) -> WeakHandle<A> {
+        WeakHandle::new(self.load_handle())
     }
 }
 impl<A: Asset> AssetHandle for Handle<A> {
@@ -113,6 +118,7 @@ unsafe impl<A: Asset> Reflect for Handle<A> {
     }
 }
 
+#[derive(Debug, Clone, Hash, PartialEq)]
 pub struct HandleUntyped(handle::GenericHandle);
 impl HandleUntyped {
     pub(crate) fn new(refop_sender: Sender<RefOp>, load_handle: LoadHandle) -> HandleUntyped {
@@ -128,26 +134,6 @@ impl AssetHandle for HandleUntyped {
 impl AssetHandle for &HandleUntyped {
     fn load_handle(&self) -> LoadHandle {
         self.0.load_handle()
-    }
-}
-impl Debug for HandleUntyped {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("HandleUntyped").field(&self.0).finish()
-    }
-}
-impl Clone for HandleUntyped {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-impl Hash for HandleUntyped {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
-}
-impl PartialEq for HandleUntyped {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
     }
 }
 impl Serialize for HandleUntyped {
@@ -216,5 +202,43 @@ unsafe impl Reflect for HandleUntyped {
 
     fn serializable(&self) -> Option<bevy_reflect::serde::Serializable> {
         Some(bevy_reflect::serde::Serializable::Owned(Box::new(self)))
+    }
+}
+
+pub struct WeakHandle<A: Asset>(handle::WeakHandle, PhantomData<A>);
+impl<A: Asset> WeakHandle<A> {
+    pub fn new(load_handle: LoadHandle) -> WeakHandle<A> {
+        WeakHandle(handle::WeakHandle::new(load_handle), PhantomData)
+    }
+}
+
+impl<A: Asset> AssetHandle for WeakHandle<A> {
+    fn load_handle(&self) -> LoadHandle {
+        self.0.load_handle()
+    }
+}
+impl<A: Asset> AssetHandle for &WeakHandle<A> {
+    fn load_handle(&self) -> LoadHandle {
+        self.0.load_handle()
+    }
+}
+impl<A: Asset> Debug for WeakHandle<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Handle").field(&self.0).finish()
+    }
+}
+impl<A: Asset> Clone for WeakHandle<A> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), PhantomData)
+    }
+}
+impl<A: Asset> Hash for WeakHandle<A> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+impl<A: Asset> PartialEq for WeakHandle<A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
     }
 }
