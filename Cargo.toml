@@ -36,6 +36,10 @@ name = "custom_asset"
 required-features = ["serde-importers", "asset-daemon"]
 
 [[example]]
+name = "load_status"
+required-features = ["serde-importers", "asset-daemon"]
+
+[[example]]
 name = "custom_asset_packfile"
 required-features = ["serde-importers", "packfile"]
 

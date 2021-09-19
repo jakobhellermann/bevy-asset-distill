@@ -242,3 +242,15 @@ impl<A: Asset> PartialEq for WeakHandle<A> {
         self.0 == other.0
     }
 }
+
+impl<A: Asset> PartialEq<WeakHandle<A>> for Handle<A> {
+    fn eq(&self, other: &WeakHandle<A>) -> bool {
+        self.load_handle() == other.load_handle()
+    }
+}
+
+impl<A: Asset> PartialEq<Handle<A>> for WeakHandle<A> {
+    fn eq(&self, other: &Handle<A>) -> bool {
+        self.load_handle() == other.load_handle()
+    }
+}
