@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use bevy_app::Events;
 use bevy_ecs::prelude::*;
@@ -145,26 +145,7 @@ impl<A: Asset> TypedAssetStorage<A> for Assets<A> {
     }
 }
 
-pub trait MutableAssetStorage {
-    fn update_asset(
-        &mut self,
-        loader_info: &dyn LoaderInfoProvider,
-        asset_type_id: &AssetTypeId,
-        data: Vec<u8>,
-        load_handle: LoadHandle,
-        load_op: AssetLoadOp,
-        version: u32,
-    ) -> Result<(), Box<dyn Error + Send + 'static>>;
-    fn commit_asset_version(
-        &mut self,
-        asset_type: &AssetTypeId,
-        load_handle: LoadHandle,
-        version: u32,
-    );
-    fn free(&mut self, asset_type_id: &AssetTypeId, load_handle: LoadHandle, version: u32);
-}
-
-impl<A: Asset> MutableAssetStorage for Assets<A> {
+impl<A: Asset> AssetStorage for Assets<A> {
     fn update_asset(
         &mut self,
         loader_info: &dyn LoaderInfoProvider,
@@ -252,40 +233,8 @@ impl<A: Asset> MutableAssetStorage for Assets<A> {
     }
 }
 
-// this is necessary because the `AssetStorage` has a `&self` parameter instead of `&mut self`
-pub struct SharedAssets<'a>(pub Mutex<&'a mut dyn MutableAssetStorage>);
-impl<'a> AssetStorage for SharedAssets<'a> {
-    fn update_asset(
-        &self,
-        loader_info: &dyn LoaderInfoProvider,
-        asset_type: &AssetTypeId,
-        data: Vec<u8>,
-        load_handle: LoadHandle,
-        load_op: AssetLoadOp,
-        version: u32,
-    ) -> Result<(), Box<dyn Error + Send + 'static>> {
-        let mut this = self.0.lock().unwrap();
-        this.update_asset(loader_info, asset_type, data, load_handle, load_op, version)
-    }
-
-    fn commit_asset_version(
-        &self,
-        asset_type: &AssetTypeId,
-        load_handle: LoadHandle,
-        version: u32,
-    ) {
-        let mut this = self.0.lock().unwrap();
-        this.commit_asset_version(asset_type, load_handle, version)
-    }
-
-    fn free(&self, asset_type: &AssetTypeId, load_handle: LoadHandle, version: u32) {
-        let mut this = self.0.lock().unwrap();
-        this.free(asset_type, load_handle, version)
-    }
-}
-
 type AssetStorageProvider =
-    Box<dyn (Fn(&mut World) -> &mut dyn MutableAssetStorage) + Send + Sync + 'static>;
+    Box<dyn (Fn(&mut World) -> &mut dyn AssetStorage) + Send + Sync + 'static>;
 
 #[derive(Default)]
 pub struct AssetResources(HashMap<AssetTypeId, AssetStorageProvider>);
@@ -299,21 +248,23 @@ impl AssetResources {
     }
 }
 
-pub(crate) struct WorldAssetStorage<'w>(pub Mutex<&'w mut World>, pub &'w AssetResources);
+pub(crate) struct WorldAssetStorage<'w>(pub &'w mut World, pub &'w AssetResources);
 impl<'w> WorldAssetStorage<'w> {
-    fn with<R>(&self, asset_type: &AssetTypeId, f: impl FnOnce(&dyn AssetStorage) -> R) -> R {
-        let mut world = self.0.lock().unwrap();
+    fn with<R>(
+        &mut self,
+        asset_type: &AssetTypeId,
+        f: impl FnOnce(&mut dyn AssetStorage) -> R,
+    ) -> R {
         // TODO: better error message
         let func = self.1 .0.get(asset_type).expect("asset not registered");
-        let typed_storage = func(&mut world);
+        let typed_storage = func(&mut self.0);
 
-        let storage = SharedAssets(Mutex::new(typed_storage));
-        f(&storage)
+        f(typed_storage)
     }
 }
 impl AssetStorage for WorldAssetStorage<'_> {
     fn update_asset(
-        &self,
+        &mut self,
         loader_info: &dyn LoaderInfoProvider,
         asset_type_id: &AssetTypeId,
         data: Vec<u8>,
@@ -334,7 +285,7 @@ impl AssetStorage for WorldAssetStorage<'_> {
     }
 
     fn commit_asset_version(
-        &self,
+        &mut self,
         asset_type: &AssetTypeId,
         load_handle: LoadHandle,
         version: u32,
@@ -344,7 +295,7 @@ impl AssetStorage for WorldAssetStorage<'_> {
         })
     }
 
-    fn free(&self, asset_type_id: &AssetTypeId, load_handle: LoadHandle, version: u32) {
+    fn free(&mut self, asset_type_id: &AssetTypeId, load_handle: LoadHandle, version: u32) {
         self.with(asset_type_id, |storage| {
             storage.free(asset_type_id, load_handle, version)
         })

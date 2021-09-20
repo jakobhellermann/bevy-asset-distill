@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::prelude::*;
 use crate::storage::{AssetResources, WorldAssetStorage};
@@ -173,11 +173,11 @@ fn process_asset_events(world: &mut World) {
         distill_loader::handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
 
         world.resource_scope(|world, asset_resources: Mut<AssetResources>| {
-            let asset_storage = WorldAssetStorage(Mutex::new(world), &*asset_resources);
+            let mut asset_storage = WorldAssetStorage(world, &*asset_resources);
 
             asset_server
                 .loader_mut()
-                .process(&asset_storage, &DefaultIndirectionResolver)
+                .process(&mut asset_storage, &DefaultIndirectionResolver)
                 .unwrap();
         });
     });
