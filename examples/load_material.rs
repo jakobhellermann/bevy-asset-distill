@@ -1,11 +1,12 @@
 use bevy_app::prelude::*;
 use bevy_app::{AppExit, ScheduleRunnerPlugin};
+use bevy_asset_distill::importer::RonImporter;
 use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
 
-#[derive(Serialize, Deserialize, TypeUuid, SerdeImportable, Debug)]
+#[derive(Serialize, Deserialize, TypeUuid, Debug)]
 #[uuid = "5812e726-a166-401f-88bf-5b77fa6add0b"]
 pub struct Material {
     pub color: [f32; 4],
@@ -20,6 +21,7 @@ fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
         .add_plugin(LogPlugin::default())
+        .add_asset_loader("bmat", RonImporter::<Material>::new())
         .add_plugin(AssetPlugin)
         .add_asset::<Material>()
         .add_startup_system(setup)
@@ -28,7 +30,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
-    let material = asset_server.load("material.ron");
+    let material = asset_server.load("material.bmat");
     commands.spawn_bundle(PbrBundle { material });
 }
 

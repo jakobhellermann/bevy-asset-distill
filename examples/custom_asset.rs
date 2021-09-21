@@ -1,11 +1,12 @@
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
+use bevy_asset_distill::importer::RonImporter;
 use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
 
-#[derive(Serialize, Deserialize, TypeUuid, SerdeImportable, Debug)]
+#[derive(Serialize, Deserialize, TypeUuid, Debug)]
 #[uuid = "fab4249b-f95d-411d-a017-7549df090a4f"]
 pub struct CustomAsset {
     pub cool_string: String,
@@ -15,6 +16,7 @@ fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
         .add_plugin(LogPlugin)
+        .add_asset_loader("casset", RonImporter::<CustomAsset>::new())
         .add_plugin(AssetPlugin)
         .add_asset::<CustomAsset>()
         .add_startup_system(setup)
@@ -25,7 +27,7 @@ fn main() {
 struct HandleComponent(Handle<CustomAsset>);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let handle = asset_server.load("custom_asset.ron");
+    let handle = asset_server.load("custom_asset.casset");
 
     commands.spawn().insert(HandleComponent(handle));
 }
