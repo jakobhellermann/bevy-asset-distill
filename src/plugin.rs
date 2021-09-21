@@ -166,7 +166,7 @@ struct RefopSender(Arc<Sender<RefOp>>);
 struct AssetHandleAllocator(Arc<dyn HandleAllocator>);
 
 #[derive(Default)]
-struct AssetLoaders(Vec<(&'static str, Box<dyn BoxedImporter + 'static>)>);
+struct AssetLoaders(Vec<(&'static [&'static str], Box<dyn BoxedImporter + 'static>)>);
 
 impl Plugin for AssetPlugin {
     fn build(&self, app: &mut App) {
@@ -235,11 +235,11 @@ pub trait AddAsset {
     fn add_asset<T: Asset>(&mut self) -> &mut Self;
     fn init_asset_loader<T: BoxedImporter + FromWorld>(
         &mut self,
-        extension: &'static str,
+        extensions: &'static [&'static str],
     ) -> &mut Self;
     fn add_asset_loader<T: BoxedImporter>(
         &mut self,
-        extension: &'static str,
+        extensions: &'static [&'static str],
         loader: T,
     ) -> &mut Self;
 }
@@ -275,21 +275,21 @@ impl AddAsset for App {
 
     fn init_asset_loader<T: BoxedImporter + FromWorld>(
         &mut self,
-        extension: &'static str,
+        extensions: &'static [&'static str],
     ) -> &mut Self {
         let loader = T::from_world(&mut self.world);
-        Self::add_asset_loader(self, extension, loader)
+        Self::add_asset_loader(self, extensions, loader)
     }
 
     fn add_asset_loader<T: BoxedImporter>(
         &mut self,
-        extension: &'static str,
+        extensions: &'static [&'static str],
         loader: T,
     ) -> &mut Self {
         self.world
             .get_resource_or_insert_with(AssetLoaders::default)
             .0
-            .push((extension, Box::new(loader)));
+            .push((extensions, Box::new(loader)));
         self
     }
 }

@@ -12,7 +12,7 @@ fn main() {
         .insert_resource(AssetServerSettings::Packfile(PackfileSettings::Static(
             include_bytes!("../resources/assets.pack"),
         )))
-        .add_asset_loader("txt", bevy_asset_distill::importer::TextImporter)
+        .add_asset_loader(&["txt"], bevy_asset_distill::importer::TextImporter)
         .add_plugin(AssetPlugin)
         .add_asset::<String>()
         .add_startup_system(setup)

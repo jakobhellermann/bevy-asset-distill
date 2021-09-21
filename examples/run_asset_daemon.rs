@@ -5,11 +5,11 @@ fn main() {
     tracing_subscriber::fmt::init();
 
     let (handle, _) = AssetDaemon::default()
-        .with_importer("casset", RonImporter::<assets::CustomAsset>::new())
-        .with_importer("bmat", RonImporter::<assets::Material>::new())
-        .with_importer("tex", RonImporter::<assets::Texture>::new())
-        .with_importer("mat", RonImporter::<assets::StandardMaterial>::new())
-        .with_importer("txt", TextImporter)
+        .with_importer(&["casset"], RonImporter::<assets::CustomAsset>::new())
+        .with_importer(&["bmat"], RonImporter::<assets::Material>::new())
+        .with_importer(&["tex"], RonImporter::<assets::Texture>::new())
+        .with_importer(&["mat"], RonImporter::<assets::StandardMaterial>::new())
+        .with_importer(&["txt"], TextImporter)
         .run();
     handle.join().unwrap();
 }

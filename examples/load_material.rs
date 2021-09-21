@@ -21,7 +21,7 @@ fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
         .add_plugin(LogPlugin::default())
-        .add_asset_loader("bmat", RonImporter::<Material>::new())
+        .add_asset_loader(&["bmat"], RonImporter::<Material>::new())
         .add_plugin(AssetPlugin)
         .add_asset::<Material>()
         .add_startup_system(setup)

@@ -16,7 +16,7 @@ fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
         .add_plugin(LogPlugin)
-        .add_asset_loader("casset", RonImporter::<CustomAsset>::new())
+        .add_asset_loader(&["casset"], RonImporter::<CustomAsset>::new())
         .add_plugin(AssetPlugin)
         .add_asset::<CustomAsset>()
         .add_startup_system(setup)

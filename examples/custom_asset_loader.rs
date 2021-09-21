@@ -84,7 +84,7 @@ fn main() {
     App::new()
         .add_plugin(ScheduleRunnerPlugin::default())
         .add_plugin(LogPlugin::default())
-        .add_asset_loader("png", ImageImporter)
+        .add_asset_loader(&["png"], ImageImporter)
         .add_plugin(AssetPlugin)
         .add_asset::<Image>()
         .add_startup_system(setup)
