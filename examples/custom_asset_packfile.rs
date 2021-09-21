@@ -4,6 +4,7 @@ use bevy_asset_distill::prelude::*;
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
 use bevy_ecs::prelude::*;
+use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
 
 fn main() {
@@ -39,6 +40,6 @@ fn system(
         _ => return,
     };
 
-    println!("{}...", &lorem_ipsum[..100]);
+    info!("{}...", &lorem_ipsum[..100]);
     app_exit.send(AppExit);
 }

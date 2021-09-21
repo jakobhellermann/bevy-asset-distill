@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-asset-daemon = ["distill-daemon", "distill-loader/rpc_io"]
+asset-daemon = ["distill-daemon", "rpc-io"]
 packfile = ["distill-loader/packfile_io"]
 serde-importers = ["distill-importer/serde_importers"]
+rpc-io = ["distill-loader/rpc_io"]
 ron-importer = ["ron"]
 
 [dependencies]
@@ -30,37 +31,40 @@ ron = { version = "0.6", optional = true }
 
 [dev-dependencies]
 image = { version = "0.23", default-features = false, features = ["png"] }
+tracing-subscriber = "0.2"
+tracing = "0.1"
+tracing-log = "0.1"
 
 [[example]]
 name = "custom_asset"
-required-features = ["serde-importers", "asset-daemon"]
+required-features = ["serde-importers", "rpc-io"]
 
 [[example]]
 name = "load_status"
-required-features = ["serde-importers", "asset-daemon"]
+required-features = ["serde-importers", "rpc-io"]
 
 [[example]]
 name = "custom_asset_packfile"
-required-features = ["serde-importers", "packfile"]
+required-features = ["packfile"]
 
 [[example]]
 name = "custom_asset_loader"
-required-features = ["asset-daemon"]
+required-features = ["rpc-io"]
 
 [[example]]
 name = "load_material"
-required-features = ["serde-importers", "asset-daemon"]
+required-features = ["serde-importers", "rpc-io"]
 
 [[example]]
 name = "deserialize_handle"
-required-features = ["asset-daemon", "ron-importer"]
+required-features = ["rpc-io", "ron-importer"]
 
 [[example]]
 name = "run_asset_daemon"
 required-features = ["asset-daemon"]
 
 [patch."https://github.com/amethyst/distill"]
-distill-core = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
-distill-loader = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
-distill-importer = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
-distill-daemon = { git = "https://github.com/jakobhellermann/distill", branch = "compile-on-wasm" }
+distill-core = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
+distill-loader = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
+distill-importer = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
+distill-daemon = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }

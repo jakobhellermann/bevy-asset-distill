@@ -27,8 +27,30 @@ enum AssetSystem {
 pub enum AssetServerSettings {
     #[cfg(feature = "asset-daemon")]
     Daemon(AssetDaemonSettings),
+    #[cfg(feature = "rpc-io")]
+    DaemonWebsocket(AssetDaemonWebsocketSettings),
     #[cfg(feature = "packfile")]
     Packfile(PackfileSettings),
+}
+impl AssetServerSettings {
+    fn default_fallback() -> Option<Self> {
+        #[cfg(feature = "asset-daemon")]
+        return Some(AssetServerSettings::Daemon(AssetDaemonSettings::default()));
+        #[cfg(all(not(feature = "asset-daemon"), feature = "rpc-io"))]
+        #[cfg(all(
+            not(feature = "asset-daemon"),
+            feature = "rpc-io",
+            target_arch = "wasm32"
+        ))]
+        return Some(AssetServerSettings::DaemonWebsocket(
+            AssetDaemonWebsocketSettings::default(),
+        ));
+        #[cfg(any(
+            not(feature = "asset-daemon"),
+            all(not(feature = "rpc-io"), not(target_arch = "wasm32"))
+        ))]
+        return None;
+    }
 }
 
 #[cfg(feature = "packfile")]
@@ -56,6 +78,20 @@ impl Default for AssetDaemonSettings {
             db_path: std::path::PathBuf::from(".assets_db"),
             address: ([127, 0, 0, 1], 9999).into(),
             clear_db_on_start: false,
+        }
+    }
+}
+
+#[cfg(feature = "rpc-io")]
+#[derive(Debug, Clone)]
+pub struct AssetDaemonWebsocketSettings {
+    address: std::net::SocketAddr,
+}
+#[cfg(feature = "rpc-io")]
+impl Default for AssetDaemonWebsocketSettings {
+    fn default() -> Self {
+        AssetDaemonWebsocketSettings {
+            address: ([127, 0, 0, 1], 9998).into(),
         }
     }
 }
@@ -91,7 +127,17 @@ impl AssetServerSettings {
         match *self {
             #[cfg(feature = "asset-daemon")]
             AssetServerSettings::Daemon(ref settings) => Ok(Box::new(
-                distill_loader::RpcIO::new(settings.address.to_string()).unwrap(),
+                distill_loader::RpcIO::new(distill_loader::rpc_io::RpcConnectionType::TCP(
+                    settings.address.to_string(),
+                ))
+                .unwrap(),
+            )),
+            #[cfg(feature = "rpc-io")]
+            AssetServerSettings::DaemonWebsocket(ref settings) => Ok(Box::new(
+                distill_loader::RpcIO::new(distill_loader::rpc_io::RpcConnectionType::Websocket(
+                    settings.address.to_string(),
+                ))
+                .unwrap(),
             )),
             #[cfg(feature = "packfile")]
             #[cfg(not(target_family = "wasm"))]
@@ -124,12 +170,10 @@ impl Plugin for AssetPlugin {
         #[allow(unused_variables)]
         let asset_loaders = world.remove_resource::<AssetLoaders>().unwrap_or_default();
 
-        #[cfg(feature = "asset-daemon")]
         let asset_server_settings = world.get_resource_or_insert_with(|| {
-            AssetServerSettings::Daemon(AssetDaemonSettings::default())
+            AssetServerSettings::default_fallback()
+                .unwrap_or_else(|| panic!("missing `AssetServerSettings` resource. Either insert it or enable the `asset-daemon` feature or enable `rpc-io` and start the daemon yourself"))
         });
-        #[cfg(not(feature = "asset-daemon"))]
-        let asset_server_settings = world.get_resource::<AssetServerSettings>().expect("missing `AssetServerSettings` resource. Either insert it or enable the `asset-daemon` feature");
 
         #[cfg(feature = "asset-daemon")]
         if let Some(daemon) = asset_server_settings.daemon(asset_loaders) {
