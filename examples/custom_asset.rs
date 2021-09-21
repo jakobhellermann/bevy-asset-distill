@@ -1,8 +1,8 @@
-use bevy_asset_distill::prelude::*;
-
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
+use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
+use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
 
 #[derive(Serialize, Deserialize, TypeUuid, SerdeImportable, Debug)]
@@ -37,7 +37,7 @@ fn system(
     mut asset_events: EventReader<AssetEvent<CustomAsset>>,
 ) {
     for event in asset_events.iter() {
-        println!("Asset event: {:?}", event);
+        info!("Asset event: {:?}", event);
         *has_printed = false;
     }
 
@@ -48,7 +48,7 @@ fn system(
         let custom_asset = custom_assets.get(&handle.0);
 
         if let Some(custom_asset) = custom_asset {
-            println!("{:?}", custom_asset);
+            info!("{:?}", custom_asset);
             *has_printed = true;
         }
     }

@@ -1,7 +1,6 @@
-use bevy_asset_distill::prelude::*;
-
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
+use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
@@ -41,11 +40,8 @@ fn system(
 ) {
     let handle = &query.single().0;
 
-    for event in asset_events
-        .iter()
-        .filter(|event| dbg!(event).handle() == dbg!(handle))
-    {
-        println!("Asset event: {:?}", event);
+    for event in asset_events.iter() {
+        info!("Asset event: {:?}", event);
         *has_printed = false;
     }
 

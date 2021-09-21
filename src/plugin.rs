@@ -45,10 +45,14 @@ impl AssetServerSettings {
         return Some(AssetServerSettings::DaemonWebsocket(
             AssetDaemonWebsocketSettings::default(),
         ));
-        #[cfg(any(
-            not(feature = "asset-daemon"),
-            all(not(feature = "rpc-io"), not(target_arch = "wasm32"))
-        ))]
+        #[cfg(not(any(
+            feature = "asset-daemon",
+            all(
+                not(feature = "asset-daemon"),
+                feature = "rpc-io",
+                target_arch = "wasm32"
+            )
+        )))]
         return None;
     }
 }

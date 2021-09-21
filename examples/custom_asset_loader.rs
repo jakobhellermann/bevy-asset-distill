@@ -1,10 +1,12 @@
+use bevy_app::AppExit;
 use bevy_asset_distill::prelude::*;
 
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
 use bevy_asset_distill::util::AssetUuidImporterState;
 use bevy_ecs::prelude::*;
-use bevy_log::{info, LogPlugin};
+use bevy_log::prelude::*;
+use bevy_log::LogPlugin;
 use distill_importer::{ImportedAsset, Importer, ImporterValue};
 use image::RgbaImage;
 
@@ -94,21 +96,25 @@ struct HandleComponent(Handle<Image>);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let handle: Handle<Image> = asset_server.load("base_color.png");
-    info!("spawning handle");
     commands.spawn().insert(HandleComponent(handle));
 }
 
-fn system(query: Query<&HandleComponent>, custom_assets: Res<Assets<Image>>) {
+fn system(
+    query: Query<&HandleComponent>,
+    custom_assets: Res<Assets<Image>>,
+    mut app_exit: EventWriter<AppExit>,
+) {
     let handle = query.single();
-    let custom_asset = custom_assets.get(&handle.0);
+    let image = match custom_assets.get(&handle.0) {
+        Some(image) => image,
+        None => return,
+    };
 
-    if let Some(custom_asset) = custom_asset {
-        info!(
-            "Image dimensions are {}x{}",
-            custom_asset.0.width(),
-            custom_asset.0.height()
-        );
+    info!(
+        "Image dimensions are {}x{}",
+        image.0.width(),
+        image.0.height()
+    );
 
-        std::process::exit(0);
-    }
+    app_exit.send(AppExit);
 }

@@ -1,8 +1,8 @@
-use bevy_asset_distill::prelude::*;
-
 use bevy_app::prelude::*;
-use bevy_app::ScheduleRunnerPlugin;
+use bevy_app::{AppExit, ScheduleRunnerPlugin};
+use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
+use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
 
 #[derive(Serialize, Deserialize, TypeUuid, SerdeImportable, Debug)]
@@ -32,14 +32,18 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     commands.spawn_bundle(PbrBundle { material });
 }
 
-fn system(objects: Query<&Handle<Material>>, materials: ResMut<Assets<Material>>) {
-    for material_handle in objects.iter() {
-        let material = match materials.get(material_handle) {
-            Some(material) => material,
-            None => continue,
-        };
+fn system(
+    objects: Query<&Handle<Material>>,
+    materials: ResMut<Assets<Material>>,
+    mut app_exit: EventWriter<AppExit>,
+) {
+    let material_handle = objects.single();
+    let material = match materials.get(material_handle) {
+        Some(material) => material,
+        None => return,
+    };
 
-        println!("{:?}", material);
-        std::process::exit(0);
-    }
+    info!("{:?}", material);
+
+    app_exit.send(AppExit);
 }

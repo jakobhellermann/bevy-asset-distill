@@ -1,9 +1,9 @@
-use bevy_asset_distill::importer::RonImporter;
-use bevy_asset_distill::prelude::*;
-
 use bevy_app::prelude::*;
 use bevy_app::ScheduleRunnerPlugin;
+use bevy_asset_distill::importer::RonImporter;
+use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
+use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
 
 #[derive(TypeUuid, Deserialize, Serialize, Debug)]
@@ -41,18 +41,27 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn system(
+    mut has_printed: Local<bool>,
     query: Query<&HandleComponent<StandardMaterial>>,
     materials: Res<Assets<StandardMaterial>>,
     textures: Res<Assets<Texture>>,
+    mut asset_events: EventReader<AssetEvent<StandardMaterial>>,
 ) {
+    asset_events.iter().for_each(|_| *has_printed = false);
+
+    if *has_printed {
+        return;
+    };
+
     let handle = query.single();
-    let material = materials.get(&handle.0);
+    let material = match materials.get(&handle.0) {
+        Some(material) => material,
+        None => return,
+    };
 
-    if let Some(material) = material {
-        let texture = textures.get(&material.texture_by_path).unwrap();
-        println!("{:?}", material);
-        println!("{:?}", texture);
+    let texture = textures.get(&material.texture_by_path).unwrap();
+    info!("{:?}", material);
+    info!("{:?}", texture);
 
-        std::process::exit(0);
-    }
+    *has_printed = true;
 }

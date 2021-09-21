@@ -1,9 +1,9 @@
 use bevy_app::prelude::*;
-use bevy_app::ScheduleRunnerSettings;
+use bevy_app::{ScheduleRunnerPlugin, ScheduleRunnerSettings};
 use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
-
-use bevy_app::ScheduleRunnerPlugin;
+use bevy_log::prelude::*;
+use bevy_log::LogPlugin;
 
 #[derive(Debug, TypeUuid, Deserialize)]
 #[uuid = "aee46b37-d4d1-4dcf-812c-ca5fa48eeee5"]
@@ -21,6 +21,7 @@ fn main() {
         .insert_resource(ScheduleRunnerSettings {
             run_mode: bevy_app::RunMode::Once,
         })
+        .add_plugin(LogPlugin)
         .add_plugin(ScheduleRunnerPlugin)
         .add_plugin(AssetPlugin)
         .add_asset::<Material>()
@@ -38,8 +39,8 @@ fn setup(mut commands: Commands, mut materials: ResMut<Assets<Material>>) {
 }
 
 fn system(objects: Query<&Handle<Material>>, materials: ResMut<Assets<Material>>) {
-    for material_handle in objects.iter() {
-        let material = materials.get(material_handle).unwrap();
-        println!("{:?}", material);
-    }
+    let material_handle = objects.single();
+
+    let material = materials.get(material_handle).unwrap();
+    info!("{:?}", material);
 }
