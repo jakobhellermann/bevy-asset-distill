@@ -11,6 +11,7 @@ use distill_loader::storage::{
     AssetLoadOp, AssetStorage, HandleAllocator, IndirectionTable, LoadHandle, LoaderInfoProvider,
 };
 use distill_loader::AssetTypeId;
+use serde::Deserialize;
 
 use crate::prelude::{Handle, WeakHandle};
 use crate::AssetEvent;
@@ -145,7 +146,7 @@ impl<A: Asset> TypedAssetStorage<A> for Assets<A> {
     }
 }
 
-impl<A: Asset> AssetStorage for Assets<A> {
+impl<A: Asset + for<'de> Deserialize<'de>> AssetStorage for Assets<A> {
     fn update_asset(
         &mut self,
         loader_info: &dyn LoaderInfoProvider,
@@ -239,7 +240,7 @@ type AssetStorageProvider =
 #[derive(Default)]
 pub struct AssetResources(HashMap<AssetTypeId, AssetStorageProvider>);
 impl AssetResources {
-    pub fn add<A: Asset>(&mut self) {
+    pub fn add<A: Asset + for<'de> Deserialize<'de>>(&mut self) {
         let asset_type = AssetTypeId(*A::TYPE_UUID.as_bytes());
         self.0.insert(
             asset_type,
@@ -256,7 +257,11 @@ impl<'w> WorldAssetStorage<'w> {
         f: impl FnOnce(&mut dyn AssetStorage) -> R,
     ) -> R {
         // TODO: better error message
-        let func = self.1 .0.get(asset_type).expect("asset not registered");
+        let func = self
+            .1
+             .0
+            .get(asset_type)
+            .unwrap_or_else(|| panic!("asset not registered: {}", asset_type));
         let typed_storage = func(&mut self.0);
 
         f(typed_storage)

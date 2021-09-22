@@ -10,7 +10,6 @@ use bevy_reflect::TypeUuid;
 use handle::WeakHandle;
 
 use distill_core::TypeUuidDynamic;
-use serde::Deserialize;
 
 pub use distill_importer;
 pub use handle::{Handle, HandleUntyped};
@@ -33,12 +32,11 @@ pub mod prelude {
 
 pub trait Asset: TypeUuid + AssetDynamic {}
 
-pub trait AssetDynamic: TypeUuidDynamic + for<'a> Deserialize<'a> + Send + Sync + 'static {}
+pub trait AssetDynamic: TypeUuidDynamic + Send + Sync + 'static {}
 
 impl<T> Asset for T where T: TypeUuid + AssetDynamic + TypeUuidDynamic {}
 
-impl<T> AssetDynamic for T where T: Send + Sync + 'static + TypeUuidDynamic + for<'a> Deserialize<'a>
-{}
+impl<T> AssetDynamic for T where T: Send + Sync + 'static + TypeUuidDynamic {}
 
 /// Events that happen on assets of type `T`
 pub enum AssetEvent<A: Asset> {

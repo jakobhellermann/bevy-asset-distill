@@ -232,7 +232,9 @@ fn process_asset_events(world: &mut World) {
 }
 
 pub trait AddAsset {
-    fn add_asset<T: Asset>(&mut self) -> &mut Self;
+    fn add_asset<T: Asset + for<'de> Deserialize<'de>>(&mut self) -> &mut Self;
+    fn add_asset_non_deserialize<T: Asset>(&mut self) -> &mut Self;
+
     fn init_asset_loader<T: BoxedImporter + FromWorld>(
         &mut self,
         extensions: &'static [&'static str],
@@ -245,7 +247,18 @@ pub trait AddAsset {
 }
 
 impl AddAsset for App {
-    fn add_asset<A: Asset>(&mut self) -> &mut Self {
+    fn add_asset<A: Asset + for<'de> Deserialize<'de>>(&mut self) -> &mut Self {
+        self.add_asset_non_deserialize::<A>();
+
+        self.world
+            .get_resource_mut::<AssetResources>()
+            .unwrap()
+            .add::<A>();
+
+        self
+    }
+
+    fn add_asset_non_deserialize<A: Asset>(&mut self) -> &mut Self {
         let assets = {
             let refop_sender = self.world.get_resource::<RefopSender>().unwrap();
             let asset_server = self.world.get_resource::<AssetServer>().unwrap();
@@ -257,11 +270,6 @@ impl AddAsset for App {
             )
         };
         self.world.insert_resource(assets);
-
-        self.world
-            .get_resource_mut::<AssetResources>()
-            .unwrap()
-            .add::<A>();
 
         self.register_type::<Handle<A>>()
             .add_event::<AssetEvent<A>>()

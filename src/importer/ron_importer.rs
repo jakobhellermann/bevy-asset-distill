@@ -21,7 +21,7 @@ impl<A: Asset + Serialize> RonImporter<A> {
     }
 }
 #[cfg(feature = "ron-importer")]
-impl<A: Asset + Serialize> Importer for RonImporter<A> {
+impl<A: Asset + Serialize + for<'de> Deserialize<'de>> Importer for RonImporter<A> {
     fn version_static() -> u32
     where
         Self: Sized,
