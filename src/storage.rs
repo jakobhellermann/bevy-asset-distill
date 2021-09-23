@@ -155,7 +155,7 @@ impl<A: Asset> AssetStorage for Assets<A> {
         load_op: AssetLoadOp,
         version: u32,
     ) -> Result<(), Box<dyn Error + Send + 'static>> {
-        debug_assert_eq!(A::UUID, asset_type.0);
+        debug_assert_eq!(*A::TYPE_UUID.as_bytes(), asset_type.0);
 
         // To enable automatic serde of Handle, we need to set up a SerdeContext with a RefOp sender
         let asset = futures_executor::block_on(distill_loader::handle::SerdeContext::with(
@@ -194,7 +194,7 @@ impl<A: Asset> AssetStorage for Assets<A> {
         load_handle: LoadHandle,
         version: u32,
     ) {
-        debug_assert_eq!(A::UUID, asset_type.0);
+        debug_assert_eq!(*A::TYPE_UUID.as_bytes(), asset_type.0);
 
         bevy_log::trace!(
             "commiting asset {:?}@{} (type {})",
@@ -217,7 +217,7 @@ impl<A: Asset> AssetStorage for Assets<A> {
     }
 
     fn free(&mut self, asset_type: &AssetTypeId, load_handle: LoadHandle, version: u32) {
-        debug_assert_eq!(A::UUID, asset_type.0);
+        debug_assert_eq!(*A::TYPE_UUID.as_bytes(), asset_type.0);
 
         if let Some(asset) = self.uncommitted.get(&load_handle) {
             if asset.version == version {
@@ -240,7 +240,7 @@ type AssetStorageProvider =
 pub struct AssetResources(HashMap<AssetTypeId, AssetStorageProvider>);
 impl AssetResources {
     pub fn add<A: Asset>(&mut self) {
-        let asset_type = AssetTypeId(A::UUID);
+        let asset_type = AssetTypeId(*A::TYPE_UUID.as_bytes());
         self.0.insert(
             asset_type,
             Box::new(|world| world.get_resource_mut::<Assets<A>>().unwrap().into_inner()),

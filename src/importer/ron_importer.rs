@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use bevy_reflect::Uuid;
 use distill_importer::{ImportedAsset, Importer, ImporterValue};
 
 use crate::prelude::*;
@@ -8,9 +9,9 @@ use crate::util::AssetUuidImporterState;
 pub struct RonImporter<A: Asset + Serialize>(PhantomData<A>);
 #[cfg(feature = "ron-importer")]
 impl<A: Asset + Serialize> TypeUuid for RonImporter<A> {
-    const UUID: [u8; 16] = [
+    const TYPE_UUID: Uuid = Uuid::from_bytes([
         247, 147, 34, 237, 214, 174, 75, 180, 169, 124, 10, 136, 213, 57, 10, 161,
-    ];
+    ]);
 }
 
 #[cfg(feature = "ron-importer")]

@@ -6,9 +6,9 @@ mod storage;
 pub mod util;
 
 pub use asset_server::AssetServer;
+use bevy_reflect::TypeUuid;
 use handle::WeakHandle;
 
-use distill_core::type_uuid::TypeUuid;
 use distill_core::TypeUuidDynamic;
 use serde::Deserialize;
 
@@ -26,17 +26,7 @@ pub mod prelude {
     pub use crate::plugin::{AddAsset, AssetPlugin, AssetServerSettings};
     pub use crate::{Asset, AssetEvent, AssetServer, Assets};
 
-    pub use distill_core::type_uuid::{self, TypeUuid};
-    #[cfg(feature = "serde-importers")]
-    pub use distill_importer::SerdeImportable;
-
-    // required for SerdeImportable
-    #[doc(hidden)]
-    #[cfg(feature = "serde-importers")]
-    pub use distill_importer;
-    #[doc(hidden)]
-    #[cfg(feature = "serde-importers")]
-    pub use distill_importer::typetag;
+    pub use bevy_reflect::TypeUuid;
 
     pub use serde::{Deserialize, Serialize};
 }

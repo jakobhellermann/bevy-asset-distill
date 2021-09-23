@@ -16,7 +16,7 @@ bevy_reflect = { git = "https://github.com/bevyengine/bevy" }
 bevy_utils = { git = "https://github.com/bevyengine/bevy" }
 bevy_log = { git = "https://github.com/bevyengine/bevy" }
 
-distill-core = { git = "https://github.com/amethyst/distill", features = ["type_uuid"] }
+distill-core = { git = "https://github.com/amethyst/distill", features = ["bevy_reflect"] }
 distill-loader = { git = "https://github.com/amethyst/distill", features = ["handle"] }
 distill-importer = { git = "https://github.com/amethyst/distill" }
 distill-daemon = { git = "https://github.com/amethyst/distill", optional = true }
@@ -67,3 +67,6 @@ distill-core = { git = "https://github.com/jakobhellermann/distill", branch = "d
 distill-loader = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
 distill-importer = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
 distill-daemon = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
+
+[patch."https://github.com/bevyengine/bevy"]
+bevy_reflect = { path = "/home/jakob/dev/rust/contrib/bevy/bevy/crates/bevy_reflect" }

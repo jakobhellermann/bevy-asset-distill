@@ -1,5 +1,6 @@
 use bevy_app::prelude::*;
 use bevy_app::{AppExit, ScheduleRunnerPlugin};
+use bevy_asset_distill::importer::text_importer::Text;
 use bevy_asset_distill::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
@@ -14,13 +15,13 @@ fn main() {
         )))
         .add_asset_loader(&["txt"], bevy_asset_distill::importer::TextImporter)
         .add_plugin(AssetPlugin)
-        .add_asset::<String>()
+        .add_asset::<Text>()
         .add_startup_system(setup)
         .add_system(system)
         .run();
 }
 
-struct HandleComponent(Handle<String>);
+struct HandleComponent(Handle<Text>);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let handle = asset_server.load("lorem_ipsum.txt");
@@ -29,7 +30,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 fn system(
     query: Query<&HandleComponent>,
-    text_assets: Res<Assets<String>>,
+    text_assets: Res<Assets<Text>>,
     mut app_exit: EventWriter<AppExit>,
 ) {
     let handle = query.single();

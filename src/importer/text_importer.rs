@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::prelude::*;
 use crate::util::AssetUuidImporterState;
 use distill_importer::{ImportedAsset, Importer, ImporterValue};
@@ -5,6 +7,18 @@ use distill_importer::{ImportedAsset, Importer, ImporterValue};
 #[derive(TypeUuid)]
 #[uuid = "5dc1ef8a-4b0c-423f-9d60-e953292e2d1d"]
 pub struct TextImporter;
+
+#[derive(TypeUuid, Serialize, Deserialize)]
+#[serde(transparent)]
+#[uuid = "7c877a39-ee66-4295-a123-eb12fd8e147e"]
+pub struct Text(pub String);
+impl Deref for Text {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Importer for TextImporter {
     fn version_static() -> u32
@@ -40,7 +54,7 @@ impl Importer for TextImporter {
                 build_deps: vec![],
                 load_deps: vec![],
                 build_pipeline: None,
-                asset_data: Box::new(string),
+                asset_data: Box::new(Text(string)),
             }],
         })
     }
