@@ -102,7 +102,7 @@ impl Default for AssetDaemonWebsocketSettings {
 
 impl AssetServerSettings {
     #[cfg(feature = "asset-daemon")]
-    fn daemon(&self, asset_loaders: AssetLoaders) -> Option<distill_daemon::AssetDaemon> {
+    fn daemon(&self, asset_loaders: Vec<AssetLoader>) -> Option<distill_daemon::AssetDaemon> {
         match *self {
             AssetServerSettings::Daemon(AssetDaemonSettings {
                 ref asset_dirs,
@@ -115,7 +115,7 @@ impl AssetServerSettings {
                 let mut asset_daemon = distill_daemon::AssetDaemon::default()
                     .with_db_path(db_path)
                     .with_address(address)
-                    .with_importers_boxed(asset_loaders.0)
+                    .with_importers_boxed(asset_loaders)
                     .with_asset_dirs(asset_dirs.clone());
                 if clear_db_on_start {
                     asset_daemon = asset_daemon.with_clear_db_on_start();
@@ -166,24 +166,18 @@ struct RefopReceiver(Receiver<RefOp>);
 struct RefopSender(Arc<Sender<RefOp>>);
 struct AssetHandleAllocator(Arc<dyn HandleAllocator>);
 
+type AssetLoader = (&'static [&'static str], Box<dyn BoxedImporter + 'static>);
 #[derive(Default)]
-struct AssetLoaders(Vec<(&'static [&'static str], Box<dyn BoxedImporter + 'static>)>);
+struct AssetLoaders(Vec<AssetLoader>);
 
 impl Plugin for AssetPlugin {
     fn build(&self, app: &mut App) {
         let world = &mut app.world;
-        #[allow(unused_variables)]
-        let asset_loaders = world.remove_resource::<AssetLoaders>().unwrap_or_default();
 
         let asset_server_settings = world.get_resource_or_insert_with(|| {
             AssetServerSettings::default_fallback()
                 .unwrap_or_else(|| panic!("missing `AssetServerSettings` resource. Either insert it or enable the `asset-daemon` feature or enable `rpc-io` and start the daemon yourself"))
         });
-
-        #[cfg(feature = "asset-daemon")]
-        if let Some(daemon) = asset_server_settings.daemon(asset_loaders) {
-            std::thread::spawn(|| daemon.run());
-        }
 
         let (refop_sender, refop_receiver) = unbounded();
         let refop_sender = Arc::new(refop_sender);
@@ -213,6 +207,19 @@ impl Plugin for AssetPlugin {
                         .label(AssetSystem::ProcessAssetEvents),
                 ),
             );
+        #[cfg(feature = "asset-daemon")]
+        app.add_startup_system(start_asset_daemon);
+    }
+}
+
+#[cfg(feature = "asset-daemon")]
+fn start_asset_daemon(
+    mut asset_loaders: ResMut<AssetLoaders>,
+    asset_server_settings: Res<AssetServerSettings>,
+) {
+    let asset_loaders = std::mem::take(&mut asset_loaders.0);
+    if let Some(daemon) = asset_server_settings.daemon(asset_loaders) {
+        std::thread::spawn(|| daemon.run());
     }
 }
 
