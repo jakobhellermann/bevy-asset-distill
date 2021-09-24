@@ -127,3 +127,13 @@ impl AssetServer {
         self.loader.get_load_info(handle.load_handle())
     }
 }
+
+impl AssetServer {
+    pub fn with_serde_context<T, F: Fn() -> T>(&self, f: F) -> T {
+        futures_executor::block_on(distill_loader::handle::SerdeContext::with(
+            &self.loader,
+            (*self.refop_sender).clone(),
+            async { f() },
+        ))
+    }
+}
