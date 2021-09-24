@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use bevy_reflect::prelude::*;
+use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -10,12 +11,13 @@ use distill_loader::LoadHandle;
 use serde::Serialize;
 
 pub struct Handle<A: Asset>(handle::Handle<A>);
+
 impl<A: Asset> Handle<A> {
     pub(crate) fn new(refop_sender: Sender<RefOp>, load_handle: LoadHandle) -> Handle<A> {
         Handle(handle::Handle::new(refop_sender, load_handle))
     }
 
-    pub fn as_weak(&self) -> WeakHandle<A> {
+    pub fn clone_weak(&self) -> WeakHandle<A> {
         WeakHandle::new(self.load_handle())
     }
 }
@@ -49,6 +51,7 @@ impl<A: Asset> PartialEq for Handle<A> {
         self.0 == other.0
     }
 }
+impl<A: Asset> Eq for Handle<A> {}
 impl<A: Asset> Serialize for Handle<A> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.0.serialize(serializer)
@@ -85,8 +88,11 @@ unsafe impl<A: Asset> Reflect for Handle<A> {
         self
     }
 
-    fn apply(&mut self, _: &dyn Reflect) {
-        panic!("can't apply to handle");
+    fn apply(&mut self, other: &dyn Reflect) {
+        *self = other
+            .downcast_ref::<Self>()
+            .unwrap_or_else(|| panic!("Value is not {}", std::any::type_name::<Self>()))
+            .clone();
     }
 
     fn set(&mut self, other: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>> {
@@ -172,8 +178,11 @@ unsafe impl Reflect for HandleUntyped {
         self
     }
 
-    fn apply(&mut self, _: &dyn Reflect) {
-        panic!("can't apply to handle");
+    fn apply(&mut self, other: &dyn Reflect) {
+        *self = other
+            .downcast_ref::<Self>()
+            .unwrap_or_else(|| panic!("Value is not {}", std::any::type_name::<Self>()))
+            .clone();
     }
 
     fn set(&mut self, other: Box<dyn Reflect>) -> Result<(), Box<dyn Reflect>> {
@@ -205,10 +214,16 @@ unsafe impl Reflect for HandleUntyped {
     }
 }
 
+#[repr(transparent)]
 pub struct WeakHandle<A: Asset>(handle::WeakHandle, PhantomData<A>);
 impl<A: Asset> WeakHandle<A> {
-    pub fn new(load_handle: LoadHandle) -> WeakHandle<A> {
+    pub(crate) fn new(load_handle: LoadHandle) -> WeakHandle<A> {
         WeakHandle(handle::WeakHandle::new(load_handle), PhantomData)
+    }
+
+    fn ref_from_raw(handle: &handle::WeakHandle) -> &WeakHandle<A> {
+        // Safety: WeakHandle is #[repr(transparent)]
+        unsafe { std::mem::transmute(handle) }
     }
 }
 
@@ -232,6 +247,7 @@ impl<A: Asset> Clone for WeakHandle<A> {
         Self(self.0.clone(), PhantomData)
     }
 }
+impl<A: Asset> Copy for WeakHandle<A> {}
 impl<A: Asset> Hash for WeakHandle<A> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
@@ -249,8 +265,26 @@ impl<A: Asset> PartialEq<WeakHandle<A>> for Handle<A> {
     }
 }
 
+impl<A: Asset> Eq for WeakHandle<A> {}
 impl<A: Asset> PartialEq<Handle<A>> for WeakHandle<A> {
     fn eq(&self, other: &Handle<A>) -> bool {
         self.load_handle() == other.load_handle()
+    }
+}
+impl<A: Asset> std::cmp::PartialOrd for WeakHandle<A> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<A: Asset> std::cmp::Ord for WeakHandle<A> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.load_handle().0.cmp(&other.load_handle().0)
+    }
+}
+impl<A: Asset> Borrow<WeakHandle<A>> for Handle<A> {
+    fn borrow(&self) -> &WeakHandle<A> {
+        let handle: &handle::WeakHandle =
+            std::borrow::Borrow::<handle::WeakHandle>::borrow(&self.0);
+        WeakHandle::ref_from_raw(handle)
     }
 }

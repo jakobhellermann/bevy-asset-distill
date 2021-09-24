@@ -7,13 +7,12 @@ pub mod util;
 
 pub use asset_server::AssetServer;
 use bevy_reflect::TypeUuid;
-use handle::WeakHandle;
 
 use distill_core::TypeUuidDynamic;
 
 pub use distill_importer;
-pub use handle::{Handle, HandleUntyped};
-pub use plugin::{AssetPlugin, AssetStage};
+pub use handle::{Handle, HandleUntyped, WeakHandle};
+pub use plugin::{AddAsset, AssetPlugin, AssetStage};
 pub use storage::Assets;
 
 pub mod prelude {

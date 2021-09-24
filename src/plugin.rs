@@ -159,6 +159,7 @@ impl AssetServerSettings {
     }
 }
 
+#[derive(Default)]
 pub struct AssetPlugin;
 
 struct RefopReceiver(Receiver<RefOp>);
