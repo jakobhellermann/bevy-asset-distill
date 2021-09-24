@@ -42,10 +42,10 @@ fn system(
 ) {
     let handle = &query.single().0;
 
-    for event in asset_events.iter() {
-        info!("Asset event: {:?}", event);
-        *has_printed = false;
-    }
+    asset_events
+        .iter()
+        .filter(|event| custom_assets.resolve(handle).as_ref() == Some(event.handle()))
+        .for_each(|_| *has_printed = false);
 
     if *has_printed {
         return;

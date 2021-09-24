@@ -38,20 +38,21 @@ fn system(
     custom_assets: Res<Assets<CustomAsset>>,
     mut asset_events: EventReader<AssetEvent<CustomAsset>>,
 ) {
-    for event in asset_events.iter() {
-        info!("Asset event: {:?}", event);
-        *has_printed = false;
-    }
+    let handle = &query.single().0;
+
+    asset_events
+        .iter()
+        .filter(|event| custom_assets.resolve(handle).as_ref() == Some(event.handle()))
+        .for_each(|_| *has_printed = false);
 
     if *has_printed {
         return;
     }
-    for handle in query.iter() {
-        let custom_asset = custom_assets.get(&handle.0);
+    let custom_asset = match custom_assets.get(handle) {
+        Some(custom_asset) => custom_asset,
+        None => return,
+    };
 
-        if let Some(custom_asset) = custom_asset {
-            info!("{:?}", custom_asset);
-            *has_printed = true;
-        }
-    }
+    info!("{:?}", custom_asset);
+    *has_printed = true;
 }

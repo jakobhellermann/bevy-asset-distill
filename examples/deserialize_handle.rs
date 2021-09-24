@@ -47,14 +47,18 @@ fn system(
     textures: Res<Assets<Texture>>,
     mut asset_events: EventReader<AssetEvent<StandardMaterial>>,
 ) {
-    asset_events.iter().for_each(|_| *has_printed = false);
+    let handle = &query.single().0;
+
+    asset_events
+        .iter()
+        .filter(|event| materials.resolve(handle).as_ref() == Some(event.handle()))
+        .for_each(|_| *has_printed = false);
 
     if *has_printed {
         return;
     };
 
-    let handle = query.single();
-    let material = match materials.get(&handle.0) {
+    let material = match materials.get(handle) {
         Some(material) => material,
         None => return,
     };

@@ -112,6 +112,11 @@ impl<A: Asset> Assets<A> {
         self.assets.is_empty()
     }
 
+    pub fn resolve<T: AssetHandle>(&self, handle: &T) -> Option<WeakHandle<A>> {
+        let load_handle = self.resolve_handle(handle.load_handle())?;
+        Some(WeakHandle::new(load_handle))
+    }
+
     fn resolve_handle(&self, load_handle: LoadHandle) -> Option<LoadHandle> {
         if load_handle.is_indirect() {
             self.indirection_table.resolve(load_handle)
