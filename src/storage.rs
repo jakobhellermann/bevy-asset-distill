@@ -11,7 +11,7 @@ use distill_loader::storage::{
     AssetLoadOp, AssetStorage, HandleAllocator, IndirectionTable, LoadHandle, LoaderInfoProvider,
 };
 use distill_loader::AssetTypeId;
-use serde::Deserialize;
+use serde::de::DeserializeSeed;
 
 use crate::prelude::{Handle, WeakHandle};
 use crate::AssetEvent;
@@ -151,7 +151,16 @@ impl<A: Asset> TypedAssetStorage<A> for Assets<A> {
     }
 }
 
-impl<A: Asset + for<'de> Deserialize<'de>> AssetStorage for Assets<A> {
+struct AssetStorageData<'a, A: Asset, D> {
+    seed: D,
+    assets: &'a mut Assets<A>,
+}
+
+impl<'a, A, D> AssetStorage for AssetStorageData<'a, A, D>
+where
+    A: Asset,
+    D: FromWorld + Clone + for<'de> DeserializeSeed<'de, Value = A>,
+{
     fn update_asset(
         &mut self,
         loader_info: &dyn LoaderInfoProvider,
@@ -163,11 +172,18 @@ impl<A: Asset + for<'de> Deserialize<'de>> AssetStorage for Assets<A> {
     ) -> Result<(), Box<dyn Error + Send + 'static>> {
         debug_assert_eq!(*A::TYPE_UUID.as_bytes(), asset_type.0);
 
+        use bincode::Options;
+        let bincode = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .allow_trailing_bytes();
+
+        let seed = self.seed.clone();
+
         // To enable automatic serde of Handle, we need to set up a SerdeContext with a RefOp sender
         let asset = futures_executor::block_on(distill_loader::handle::SerdeContext::with(
             loader_info,
-            (*self.refop_sender).clone(),
-            async { bincode::deserialize::<A>(&data) },
+            (*self.assets.refop_sender).clone(),
+            async { bincode.deserialize_seed::<D>(seed, &data) },
         ));
         let asset = match asset {
             Ok(asset) => asset,
@@ -177,10 +193,9 @@ impl<A: Asset + for<'de> Deserialize<'de>> AssetStorage for Assets<A> {
             }
         };
 
-        self.uncommitted
+        self.assets
+            .uncommitted
             .insert(load_handle, AssetState { version, asset });
-        // The loading process could be async, in which case you can delay
-        // calling `load_op.complete` as it should only be done when the asset is usable.
         load_op.complete();
 
         bevy_log::trace!(
@@ -209,67 +224,88 @@ impl<A: Asset + for<'de> Deserialize<'de>> AssetStorage for Assets<A> {
             std::any::type_name::<A>(),
         );
         let handle = WeakHandle::new(load_handle);
-        self.events.send(AssetEvent::Modified { handle });
+        self.assets.events.send(AssetEvent::Modified { handle });
 
         // The commit step is done after an asset load has completed.
         // It exists to avoid frames where an asset that was loaded is unloaded, which
         // could happen when hot reloading. To support this case, you must support having multiple
         // versions of an asset loaded at the same time.
         let asset_state = self
+            .assets
             .uncommitted
             .remove(&load_handle)
             .expect("asset not present when committing");
-        self.assets.insert(load_handle, asset_state);
+        self.assets.assets.insert(load_handle, asset_state);
     }
 
     fn free(&mut self, asset_type: &AssetTypeId, load_handle: LoadHandle, version: u32) {
         debug_assert_eq!(*A::TYPE_UUID.as_bytes(), asset_type.0);
 
-        if let Some(asset) = self.uncommitted.get(&load_handle) {
+        if let Some(asset) = self.assets.uncommitted.get(&load_handle) {
             if asset.version == version {
-                self.uncommitted.remove(&load_handle);
+                self.assets.uncommitted.remove(&load_handle);
             }
         }
-        if let Some(asset) = self.assets.get(&load_handle) {
+        if let Some(asset) = self.assets.assets.get(&load_handle) {
             if asset.version == version {
-                self.assets.remove(&load_handle);
+                self.assets.assets.remove(&load_handle);
             }
         }
         bevy_log::trace!("free {:?}@{}", load_handle, version);
     }
 }
 
+// TODO: this is very ugly, maybe there is another way?
 type AssetStorageProvider =
-    Box<dyn (Fn(&mut World) -> &mut dyn AssetStorage) + Send + Sync + 'static>;
+    Box<dyn (Fn(&mut World, &mut dyn FnMut(&mut dyn AssetStorage))) + Send + Sync + 'static>;
 
 #[derive(Default)]
 pub struct AssetResources(HashMap<AssetTypeId, AssetStorageProvider>);
 impl AssetResources {
-    pub fn add<A: Asset + for<'de> Deserialize<'de>>(&mut self) {
+    pub fn add<A, D>(&mut self)
+    where
+        A: Asset,
+        D: FromWorld + for<'de> DeserializeSeed<'de, Value = A> + Clone,
+    {
         let asset_type = AssetTypeId(*A::TYPE_UUID.as_bytes());
         self.0.insert(
             asset_type,
-            Box::new(|world| world.get_resource_mut::<Assets<A>>().unwrap().into_inner()),
+            Box::new(|world, callback| {
+                let seed = D::from_world(world);
+                let assets = world.get_resource_mut::<Assets<A>>().unwrap().into_inner();
+                let mut storage = AssetStorageData { seed, assets };
+
+                callback(&mut storage);
+            }),
         );
     }
 }
 
-pub(crate) struct WorldAssetStorage<'w>(pub &'w mut World, pub &'w AssetResources);
+pub(crate) struct WorldAssetStorage<'w> {
+    pub world: &'w mut World,
+    pub asset_resources: &'w AssetResources,
+}
 impl<'w> WorldAssetStorage<'w> {
     fn with<R>(
         &mut self,
         asset_type: &AssetTypeId,
         f: impl FnOnce(&mut dyn AssetStorage) -> R,
     ) -> R {
-        // TODO: better error message
         let func = self
-            .1
-             .0
+            .asset_resources
+            .0
             .get(asset_type)
             .unwrap_or_else(|| panic!("asset not registered: {}", asset_type));
-        let typed_storage = func(&mut self.0);
 
-        f(typed_storage)
+        let mut f = Some(f);
+        let mut result = None;
+
+        func(&mut self.world, &mut |storage| {
+            let f = f.take().unwrap();
+            result = Some(f(storage));
+        });
+
+        result.unwrap()
     }
 }
 impl AssetStorage for WorldAssetStorage<'_> {

@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::prelude::*;
@@ -12,6 +13,7 @@ use distill_loader::handle::RefOp;
 use distill_loader::io::LoaderIO;
 use distill_loader::storage::{AtomicHandleAllocator, DefaultIndirectionResolver, HandleAllocator};
 use distill_loader::{self, Loader};
+use serde::de::DeserializeSeed;
 
 #[derive(StageLabel, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum AssetStage {
@@ -229,7 +231,10 @@ fn process_asset_events(world: &mut World) {
         distill_loader::handle::process_ref_ops(asset_server.loader(), &refop_receiver.0);
 
         world.resource_scope(|world, asset_resources: Mut<AssetResources>| {
-            let mut asset_storage = WorldAssetStorage(world, &*asset_resources);
+            let mut asset_storage = WorldAssetStorage {
+                world,
+                asset_resources: &*asset_resources,
+            };
 
             asset_server
                 .loader_mut()
@@ -241,6 +246,9 @@ fn process_asset_events(world: &mut World) {
 
 pub trait AddAsset {
     fn add_asset<T: Asset + for<'de> Deserialize<'de>>(&mut self) -> &mut Self;
+    fn add_asset_seeded<T: Asset, D: FromWorld + Clone + for<'de> DeserializeSeed<'de, Value = T>>(
+        &mut self,
+    ) -> &mut Self;
     fn add_asset_non_deserialize<T: Asset>(&mut self) -> &mut Self;
 
     fn init_asset_loader<T: BoxedImporter + FromWorld>(
@@ -256,12 +264,21 @@ pub trait AddAsset {
 
 impl AddAsset for App {
     fn add_asset<A: Asset + for<'de> Deserialize<'de>>(&mut self) -> &mut Self {
+        self.add_asset_seeded::<A, PhantomData<A>>()
+    }
+
+    fn add_asset_seeded<
+        A: Asset,
+        D: FromWorld + Clone + for<'de> DeserializeSeed<'de, Value = A>,
+    >(
+        &mut self,
+    ) -> &mut Self {
         self.add_asset_non_deserialize::<A>();
 
         self.world
             .get_resource_mut::<AssetResources>()
             .unwrap()
-            .add::<A>();
+            .add::<A, D>();
 
         self
     }
