@@ -60,6 +60,10 @@ name = "deserialize_handle"
 required-features = ["ron-importer", "rpc-io"]
 
 [[example]]
+name = "scene_inline_assets"
+required-features = ["ron-importer", "rpc-io"]
+
+[[example]]
 name = "run_asset_daemon"
 required-features = ["asset-daemon"]
 
