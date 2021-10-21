@@ -6,7 +6,7 @@ use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
 
-#[derive(TypeUuid, Deserialize, Serialize, Debug)]
+#[derive(TypeUuid, Component, Deserialize, Serialize, Debug)]
 #[uuid = "61d4452b-b891-4016-9404-65c9541e1d49"]
 struct StandardMaterial {
     color: [f32; 4],
@@ -34,6 +34,7 @@ fn main() {
         .run();
 }
 
+#[derive(Component)]
 struct HandleComponent<T: Asset>(Handle<T>);
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let handle: Handle<StandardMaterial> = asset_server.load("deserialize_handle/test.mat");

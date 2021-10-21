@@ -5,11 +5,13 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
+use bevy_ecs::prelude::Component;
 use distill_loader::crossbeam_channel::Sender;
 use distill_loader::handle::{self, AssetHandle, RefOp};
 use distill_loader::LoadHandle;
 use serde::Serialize;
 
+#[derive(Component)]
 pub struct Handle<A: Asset>(handle::Handle<A>);
 
 impl<A: Asset> Handle<A> {

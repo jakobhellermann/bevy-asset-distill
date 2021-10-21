@@ -24,6 +24,7 @@ fn main() {
         .run();
 }
 
+#[derive(Component)]
 struct HandleComponent(Handle<CustomAsset>);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
