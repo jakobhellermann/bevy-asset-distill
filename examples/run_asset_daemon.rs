@@ -1,4 +1,4 @@
-use bevy_asset_distill::importer::{RonImporter, TextImporter};
+use bevy_asset::importer::{RonImporter, TextImporter};
 use distill_daemon::AssetDaemon;
 
 fn main() {
@@ -18,7 +18,7 @@ fn main() {
 // the importers defined. Usually you would just import them from somewhere else inside your app,
 // but you can't import from example so the types are just copied here.
 mod assets {
-    use bevy_asset_distill::prelude::*;
+    use bevy_asset::prelude::*;
 
     #[derive(Serialize, Deserialize, TypeUuid, Debug)]
     #[uuid = "fab4249b-f95d-411d-a017-7549df090a4f"]

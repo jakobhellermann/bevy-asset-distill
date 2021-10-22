@@ -1,6 +1,6 @@
 use bevy_app::prelude::*;
 use bevy_app::{ScheduleRunnerPlugin, ScheduleRunnerSettings};
-use bevy_asset_distill::prelude::*;
+use bevy_asset::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
