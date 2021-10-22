@@ -13,14 +13,14 @@ ron-importer = ["ron"]
 [dependencies]
 bevy_ecs = { git = "https://github.com/bevyengine/bevy" }
 bevy_app = { git = "https://github.com/bevyengine/bevy" }
-bevy_reflect = { git = "https://github.com/bevyengine/bevy" }
+bevy_reflect = { git = "https://github.com/bevyengine/bevy", features = ["bevy"] }
 bevy_utils = { git = "https://github.com/bevyengine/bevy" }
 bevy_log = { git = "https://github.com/bevyengine/bevy" }
 
-distill-core = { git = "https://github.com/amethyst/distill", features = ["bevy_reflect"] }
-distill-loader = { git = "https://github.com/amethyst/distill", features = ["handle"] }
-distill-importer = { git = "https://github.com/amethyst/distill" }
-distill-daemon = { git = "https://github.com/amethyst/distill", optional = true }
+distill-core = { git = "https://github.com/jakobhellermann/distill", branch = "dev", features = ["bevy_reflect"] }
+distill-loader = { git = "https://github.com/jakobhellermann/distill", branch = "dev", features = ["handle"] }
+distill-importer = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
+distill-daemon = { git = "https://github.com/jakobhellermann/distill", branch = "dev", optional = true }
 
 serde = "1.0"
 bincode = "1.3"
@@ -34,6 +34,8 @@ image = { version = "0.23", default-features = false, features = ["png"] }
 tracing-subscriber = "0.2"
 tracing = "0.1"
 tracing-log = "0.1"
+ron = "0.6"
+bevy_core = { git = "https://github.com/bevyengine/bevy" }
 
 [[example]]
 name = "custom_asset"
@@ -67,11 +69,14 @@ required-features = ["ron-importer", "rpc-io"]
 name = "run_asset_daemon"
 required-features = ["asset-daemon"]
 
-[patch."https://github.com/amethyst/distill"]
-distill-core = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
-distill-loader = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
-distill-importer = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
-distill-daemon = { git = "https://github.com/jakobhellermann/distill", branch = "dev" }
+[[example]]
+name = "reflect_component"
+required-features = ["rpc-io"]
 
 [patch."https://github.com/bevyengine/bevy"]
-bevy_reflect = { path = "/home/jakob/dev/rust/contrib/bevy/bevy/crates/bevy_reflect" }
+bevy_ecs = { git = "https://github.com/jakobhellermann/bevy", branch = "bevy-asset-distill" }
+bevy_reflect = { git = "https://github.com/jakobhellermann/bevy", branch = "bevy-asset-distill" }
+bevy_log = { git = "https://github.com/jakobhellermann/bevy", branch = "bevy-asset-distill" }
+bevy_utils = { git = "https://github.com/jakobhellermann/bevy", branch = "bevy-asset-distill" }
+bevy_app = { git = "https://github.com/jakobhellermann/bevy", branch = "bevy-asset-distill" }
+bevy_core = { git = "https://github.com/jakobhellermann/bevy", branch = "bevy-asset-distill" }

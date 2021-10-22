@@ -4,11 +4,11 @@ use crate::prelude::*;
 use crate::util::AssetUuidImporterState;
 use distill_importer::{ImportedAsset, Importer, ImporterValue};
 
-#[derive(TypeUuid)]
+#[derive(TypeUuid, Default)]
 #[uuid = "5dc1ef8a-4b0c-423f-9d60-e953292e2d1d"]
 pub struct TextImporter;
 
-#[derive(TypeUuid, Serialize, Deserialize)]
+#[derive(TypeUuid, Serialize, Deserialize, Debug)]
 #[serde(transparent)]
 #[uuid = "7c877a39-ee66-4295-a123-eb12fd8e147e"]
 pub struct Text(pub String);

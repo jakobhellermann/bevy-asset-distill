@@ -1,0 +1,13 @@
+{
+  "type": "testing::StandardMaterial",
+  "struct": {
+    "a": {
+      "type": "f32",
+      "value": 1.0,
+    },
+    "handle": {
+      "type": "core::option::Option<bevy_asset::handle::Handle<bevy_asset::importer::text_importer::Text>>",
+      "value": Some("lorem_ipsum.txt"),
+    },
+  },
+}

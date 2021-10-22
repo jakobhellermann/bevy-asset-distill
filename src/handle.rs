@@ -1,5 +1,7 @@
 use crate::prelude::*;
+use bevy_ecs::prelude::ReflectComponent;
 use bevy_reflect::prelude::*;
+use bevy_reflect::FromType;
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -51,6 +53,16 @@ impl<A: Asset> PartialEq for Handle<A> {
         self.0 == other.0
     }
 }
+impl<A: Asset> std::cmp::PartialOrd for Handle<A> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<A: Asset> std::cmp::Ord for Handle<A> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.load_handle().0.cmp(&other.load_handle().0)
+    }
+}
 impl<A: Asset> Eq for Handle<A> {}
 impl<A: Asset> Serialize for Handle<A> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -68,13 +80,60 @@ impl<'de, A: Asset> Deserialize<'de> for Handle<A> {
 
 impl<A: Asset> bevy_reflect::GetTypeRegistration for Handle<A> {
     fn get_type_registration() -> bevy_reflect::TypeRegistration {
-        let registration = bevy_reflect::TypeRegistration::of::<Handle<A>>();
-        // TODO ReflectComponent
-        // let reflect_component = ReflectComponent {};
-        // registration.insert::<ReflectComponent>(reflect_component);
+        let mut registration = bevy_reflect::TypeRegistration::of::<Handle<A>>();
+        registration.insert::<ReflectDeserialize>(FromType::<Self>::from_type());
+        registration.insert::<ReflectComponent>(FromType::<Self>::from_type());
         registration
     }
 }
+
+impl<A: Asset> FromType<Handle<A>> for ReflectComponent {
+    fn from_type() -> Self {
+        ReflectComponent::new::<Handle<A>>(
+            |world, entity, reflected_component| {
+                let component = reflected_component
+                    .any()
+                    .downcast_ref::<Self>()
+                    .expect("not a Handle")
+                    .clone();
+                world.entity_mut(entity).insert(component);
+            },
+            |world, entity, reflected_component| {
+                let mut component = world.get_mut::<Handle<A>>(entity).unwrap();
+                component.apply(reflected_component);
+            },
+            |world, entity| {
+                world.entity_mut(entity).remove::<Handle<A>>();
+            },
+            |world, entity| {
+                world
+                    .get_entity(entity)?
+                    .get::<Handle<A>>()
+                    .map(|c| c as &dyn Reflect)
+            },
+            |world, entity| unsafe {
+                world
+                    .get_entity(entity)?
+                    .get_unchecked_mut::<Handle<A>>(
+                        world.last_change_tick(),
+                        world.read_change_tick(),
+                    )
+                    .map(|c| bevy_ecs::change_detection::ReflectMut::from_mut(c))
+            },
+            |source_world, destination_world, source_entity, destination_entity| {
+                let source_component = source_world
+                    .get::<Handle<A>>(source_entity)
+                    .unwrap()
+                    .clone();
+                let destination_component = source_component;
+                destination_world
+                    .entity_mut(destination_entity)
+                    .insert(destination_component);
+            },
+        )
+    }
+}
+
 unsafe impl<A: Asset> Reflect for Handle<A> {
     fn type_name(&self) -> &str {
         std::any::type_name::<Handle<A>>()

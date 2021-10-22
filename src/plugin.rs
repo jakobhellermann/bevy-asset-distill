@@ -297,6 +297,7 @@ impl AddAsset for App {
         self.world.insert_resource(assets);
 
         self.register_type::<Handle<A>>()
+            .register_type::<Option<Handle<A>>>()
             .add_event::<AssetEvent<A>>()
             .add_system_to_stage(
                 AssetStage::LoadAssets,
