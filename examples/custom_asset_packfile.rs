@@ -1,7 +1,7 @@
 use bevy_app::prelude::*;
 use bevy_app::{AppExit, ScheduleRunnerPlugin};
-use bevy_asset_distill::importer::text_importer::Text;
-use bevy_asset_distill::prelude::*;
+use bevy_asset::importer::text_importer::Text;
+use bevy_asset::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
@@ -13,7 +13,7 @@ fn main() {
         .insert_resource(AssetServerSettings::Packfile(PackfileSettings::Static(
             include_bytes!("../resources/assets.pack"),
         )))
-        .add_asset_loader(&["txt"], bevy_asset_distill::importer::TextImporter)
+        .add_asset_loader(&["txt"], bevy_asset::importer::TextImporter)
         .add_plugin(AssetPlugin)
         .add_asset::<Text>()
         .add_startup_system(setup)

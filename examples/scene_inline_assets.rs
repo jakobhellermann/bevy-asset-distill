@@ -1,9 +1,7 @@
-use bevy_app::AppExit;
-use bevy_asset_distill::prelude::*;
-
 use bevy_app::prelude::*;
-use bevy_app::ScheduleRunnerPlugin;
-use bevy_asset_distill::util::AssetUuidImporterState;
+use bevy_app::{AppExit, ScheduleRunnerPlugin};
+use bevy_asset::prelude::*;
+use bevy_asset::util::AssetUuidImporterState;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_log::LogPlugin;
