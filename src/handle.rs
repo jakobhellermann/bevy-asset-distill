@@ -280,6 +280,10 @@ impl<A: Asset> WeakHandle<A> {
         WeakHandle(handle::WeakHandle::new(load_handle), PhantomData)
     }
 
+    pub fn upgrade(self, assets: &Assets<A>) -> Handle<A> {
+        Handle(self.0.upgrade((*assets.refop_sender).clone()))
+    }
+
     fn ref_from_raw(handle: &handle::WeakHandle) -> &WeakHandle<A> {
         // Safety: WeakHandle is #[repr(transparent)]
         unsafe { std::mem::transmute(handle) }

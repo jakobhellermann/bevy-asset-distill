@@ -23,7 +23,7 @@ struct AssetState<A> {
     asset: A,
 }
 pub struct Assets<A: Asset> {
-    refop_sender: Arc<Sender<RefOp>>,
+    pub(crate) refop_sender: Arc<Sender<RefOp>>,
     handle_allocator: Arc<dyn HandleAllocator>,
     assets: HashMap<LoadHandle, AssetState<A>>,
     uncommitted: HashMap<LoadHandle, AssetState<A>>,
