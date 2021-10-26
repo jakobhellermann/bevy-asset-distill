@@ -39,14 +39,14 @@ impl<T> AssetDynamic for T where T: Send + Sync + 'static + TypeUuidDynamic {}
 
 /// Events that happen on assets of type `T`
 pub enum AssetEvent<A: Asset> {
-    Modified { handle: WeakHandle<A> },
-    Removed { handle: WeakHandle<A> },
+    Modified { handle: WeakHandle<A>, version: u32 },
+    Removed { handle: WeakHandle<A>, version: u32 },
 }
 impl<A: Asset> AssetEvent<A> {
     pub fn handle(&self) -> &WeakHandle<A> {
         match self {
-            AssetEvent::Modified { handle } => handle,
-            AssetEvent::Removed { handle } => handle,
+            AssetEvent::Modified { handle, .. } => handle,
+            AssetEvent::Removed { handle, .. } => handle,
         }
     }
 }

@@ -64,11 +64,17 @@ impl<A: Asset> Assets<A> {
     pub fn get_mut<T: AssetHandle>(&mut self, handle: &T) -> Option<&mut A> {
         let handle = self.resolve_handle(handle.load_handle())?;
 
+        let (asset, version) = self
+            .assets
+            .get_mut(&handle)
+            .map(|a| (&mut a.asset, a.version))?;
+
         self.events.send(AssetEvent::Modified {
             handle: WeakHandle::new(handle),
+            version,
         });
 
-        self.assets.get_mut(&handle).map(|a| &mut a.asset)
+        Some(asset)
     }
 
     pub fn add(&mut self, asset: A) -> Handle<A> {
@@ -78,6 +84,7 @@ impl<A: Asset> Assets<A> {
 
         self.events.send(AssetEvent::Modified {
             handle: WeakHandle::new(load_handle),
+            version: 0,
         });
 
         Handle::new((*self.refop_sender).clone(), load_handle)
@@ -85,13 +92,12 @@ impl<A: Asset> Assets<A> {
 
     pub fn remove<T: AssetHandle>(&mut self, handle: &T) -> Option<A> {
         let handle = self.resolve_handle(handle.load_handle())?;
-        let asset = self.assets.remove(&handle).map(|a| a.asset);
-        if asset.is_some() {
-            self.events.send(AssetEvent::Removed {
-                handle: WeakHandle::new(handle),
-            })
-        }
-        asset
+        let (asset, version) = self.assets.remove(&handle).map(|a| (a.asset, a.version))?;
+        self.events.send(AssetEvent::Removed {
+            handle: WeakHandle::new(handle),
+            version,
+        });
+        Some(asset)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (WeakHandle<A>, &A)> {
@@ -224,7 +230,9 @@ where
             std::any::type_name::<A>(),
         );
         let handle = WeakHandle::new(load_handle);
-        self.assets.events.send(AssetEvent::Modified { handle });
+        self.assets
+            .events
+            .send(AssetEvent::Modified { handle, version });
 
         // The commit step is done after an asset load has completed.
         // It exists to avoid frames where an asset that was loaded is unloaded, which
@@ -251,6 +259,12 @@ where
                 self.assets.assets.remove(&load_handle);
             }
         }
+
+        let handle = WeakHandle::new(load_handle);
+        self.assets
+            .events
+            .send(AssetEvent::Removed { handle, version });
+
         bevy_log::trace!("free {:?}@{}", load_handle, version);
     }
 }
